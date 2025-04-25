@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ✅ Permisos necesarios para red y estado -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Ypqr"
+        tools:targetApi="31">
+
+        <!-- ✅ Actividad principal con intent-filters de HioPos -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.Ypqr">
+
+            <!-- Filtros de intent de HioPosCloud -->
+            <intent-filter>
+                <action android:name="icg.actions.electronicpayment.none.INITIALIZE" />
+                <action android:name="icg.actions.electronicpayment.tefbanesco.FINALIZE" />
+                <action android:name="icg.actions.electronicpayment.tefbanesco.GET_VERSION" />
+                <action android:name="icg.actions.electronicpayment.tefbanesco.SHOW_SETUP_SCREEN" />
+                <action android:name="icg.actions.electronicpayment.tefbanesco.GET_BEHAVIOR" />
+                <action android:name="icg.actions.electronicpayment.tefbanesco.GET_CUSTOM_PARAMS" />
+                <action android:name="icg.actions.electronicpayment.tefbanesco.TRANSACTION" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- Lanzador manual para pruebas locales -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- ✅ Actividad que muestra el resultado del QR -->
+        <activity
+            android:name=".QrResultActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Ypqr"
+            android:label="QR Result" />
+
+    </application>
+
+</manifest>
