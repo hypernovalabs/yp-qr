@@ -21,30 +21,11 @@ fun ConfigDialog(onDismiss: () -> Unit) {
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
 
-    // Estado del resumen
-    var showSummary by remember { mutableStateOf(false) }
-
-    // Inputs
-    var apiKey by remember { mutableStateOf("") }
-    var secretKey by remember { mutableStateOf("") }
-    var deviceId by remember { mutableStateOf("") }
-    var deviceName by remember { mutableStateOf("") }
-    var deviceUser by remember { mutableStateOf("") }
-    var groupId by remember { mutableStateOf("") }
-
-    // Cargar configuración existente al abrir
-    LaunchedEffect(Unit) {
-        val config = LocalStorage.getConfig(context)
-        if (config.values.any { it.isNotEmpty() }) {
-            apiKey = config["api_key"] ?: ""
-            secretKey = config["secret_key"] ?: ""
-            deviceId = config["device.id"] ?: ""
-            deviceName = config["device.name"] ?: ""
-            deviceUser = config["device.user"] ?: ""
-            groupId = config["group_id"] ?: ""
-            showSummary = true
-        }
-    }
+    // Estados
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -55,131 +36,70 @@ fun ConfigDialog(onDismiss: () -> Unit) {
             tonalElevation = 8.dp,
             color = MaterialTheme.colorScheme.background
         ) {
-            if (showSummary) {
-                // 🌟 RESUMEN
-                Column(
-                    modifier = Modifier
-                        .padding(24.dp)
-                        .verticalScroll(rememberScrollState()) // ✅ Scroll habilitado
-                ) {
-                    Text("Resumen de Configuración", style = MaterialTheme.typography.headlineSmall)
-                    Spacer(modifier = Modifier.height(16.dp))
+            Column(
+                modifier = Modifier
+                    .padding(24.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text("Iniciar Sesión", style = MaterialTheme.typography.headlineSmall)
+                Spacer(modifier = Modifier.height(16.dp))
 
-                    Text("API Key: $apiKey")
-                    Text("Secret Key: $secretKey")
-                    Text("Device ID: $deviceId")
-                    Text("Device Name: $deviceName")
-                    Text("Device User: $deviceUser")
-                    Text("Group ID: $groupId")
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = { username = it },
+                    label = { Text("Usuario") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Contraseña") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                        TextButton(onClick = {
-                            showSummary = false
-                        }) {
-                            Text("Editar")
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Button(onClick = {
-                            scope.launch {
-                                LocalStorage.clear(context)
-                                onDismiss()
-                            }
-                        }) {
-                            Text("Eliminar")
-                        }
-                    }
+                Spacer(modifier = Modifier.height(24.dp))
+
+                if (errorMessage != null) {
+                    Text(
+                        text = errorMessage ?: "",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
-            }
 
-            else {
-                // 🧾 FORMULARIO
-                Column(
-                    modifier = Modifier
-                        .padding(24.dp)
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    Text("Configuración API", style = MaterialTheme.typography.headlineSmall)
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Fila 1
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlinedTextField(
-                            value = apiKey,
-                            onValueChange = { apiKey = it },
-                            label = { Text("API Key") },
-                            modifier = Modifier.weight(1f)
-                        )
-                        OutlinedTextField(
-                            value = secretKey,
-                            onValueChange = { secretKey = it },
-                            label = { Text("Secret Key") },
-                            visualTransformation = PasswordVisualTransformation(),
-                            modifier = Modifier.weight(1f)
-                        )
+                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancelar")
                     }
-
-                    // Fila 2
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlinedTextField(
-                            value = deviceId,
-                            onValueChange = { deviceId = it },
-                            label = { Text("Device ID") },
-                            modifier = Modifier.weight(1f)
-                        )
-                        OutlinedTextField(
-                            value = deviceName,
-                            onValueChange = { deviceName = it },
-                            label = { Text("Device Name") },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-
-                    // Fila 3
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlinedTextField(
-                            value = deviceUser,
-                            onValueChange = { deviceUser = it },
-                            label = { Text("Device User") },
-                            modifier = Modifier.weight(1f)
-                        )
-                        OutlinedTextField(
-                            value = groupId,
-                            onValueChange = { groupId = it },
-                            label = { Text("Group ID") },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                        TextButton(onClick = onDismiss) {
-                            Text("Cancelar")
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Button(onClick = {
-                            if (apiKey.isNotBlank() && secretKey.isNotBlank() &&
-                                deviceId.isNotBlank() && deviceName.isNotBlank() &&
-                                deviceUser.isNotBlank() && groupId.isNotBlank()
-                            ) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            if (username.isNotBlank() && password.isNotBlank()) {
                                 scope.launch {
-                                    LocalStorage.saveConfig(
+                                    isLoading = true
+                                    errorMessage = null
+                                    val success = ConfigNetworkHelper.loginAndSaveConfig(
                                         context,
-                                        apiKey,
-                                        secretKey,
-                                        deviceId,
-                                        deviceName,
-                                        deviceUser,
-                                        groupId
+                                        username,
+                                        password
                                     )
-                                    showSummary = true
+                                    isLoading = false
+                                    if (success) {
+                                        // 🔵 Recargar configuración después de guardar
+                                        ConfigManager.loadConfig(context)
+                                        onDismiss()
+                                    } else {
+                                        errorMessage = "Credenciales inválidas o error en la conexión."
+                                    }
                                 }
                             }
-                        }) {
-                            Text("Guardar")
-                        }
+                        },
+                        enabled = !isLoading
+                    ) {
+                        Text(if (isLoading) "Cargando..." else "Obtener Configuración")
                     }
                 }
             }

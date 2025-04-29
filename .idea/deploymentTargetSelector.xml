@@ -4,10 +4,10 @@
     <selectionStates>
       <SelectionState runConfigName="yp-qr">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2025-04-23T22:15:11.795204Z">
+        <DropdownSelection timestamp="2025-04-25T21:02:00.308972Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="PhysicalDevice" identifier="serial=TX6MCW9K88" />
+              <DeviceId pluginId="Default" identifier="serial=192.168.128.185:5555;connection=d642c447" />
             </handle>
           </Target>
         </DropdownSelection>

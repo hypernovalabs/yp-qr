@@ -5,7 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.navigation.compose.rememberNavController
@@ -56,17 +56,33 @@ class MainActivity : ComponentActivity() {
         val qrHash = intent?.getStringExtra("hash")
 
         enableEdgeToEdge()
+
+        // 🔵 Cargar ConfigManager primero
+        ConfigManager.loadConfig(this)
+
         setContent {
             YpqrTheme {
                 Surface(modifier = Modifier, color = Color(0xFF2196F3)) {
                     val navController = rememberNavController()
-                    AppNavigationWithExtras(
-                        navController = navController,
-                        navigateTo = navigateTo,
-                        date = qrDate,
-                        transactionId = qrTransactionId,
-                        hash = qrHash
-                    )
+
+                    if (ApiConfig.isBaseUrlConfigured()) {
+                        // ✅ BASE_URL disponible: navegar normal
+                        AppNavigationWithExtras(
+                            navController = navController,
+                            navigateTo = navigateTo,
+                            date = qrDate,
+                            transactionId = qrTransactionId,
+                            hash = qrHash
+                        )
+                    } else {
+                        // 🚨 BASE_URL no configurado: mostrar ConfigDialog
+                        ConfigDialog(
+                            onDismiss = {
+                                // Una vez configurado, podrías navegar al home o refrescar
+                                navController.navigate("home") // Ajusta según tu flujo
+                            }
+                        )
+                    }
                 }
             }
         }
