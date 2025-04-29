@@ -1,4 +1,4 @@
-package com.example.yp_qr
+package com.example.yp_qr.dialogs
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape

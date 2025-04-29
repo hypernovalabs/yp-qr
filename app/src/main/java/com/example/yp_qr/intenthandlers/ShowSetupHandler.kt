@@ -4,7 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import com.example.yp_qr.ConfigDialog
+import com.example.yp_qr.dialogs.ConfigDialog
 import com.example.yp_qr.ui.theme.YpqrTheme
 
 class ShowSetupHandler(private val activity: Activity) {

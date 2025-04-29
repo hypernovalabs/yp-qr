@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
+    <!-- Tema para toda la aplicación -->
+    <style name="AppTheme" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+        <item name="colorPrimary">@color/purple_500</item>
+        <item name="colorPrimaryVariant">@color/purple_700</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+    </style>
+
+    <!-- Tema adicional para pantallas específicas si quieres -->
     <style name="Theme.Ypqr" parent="android:Theme.Material.Light.NoActionBar" />
+
 </resources>

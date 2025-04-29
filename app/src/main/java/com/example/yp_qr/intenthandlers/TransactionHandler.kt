@@ -6,133 +6,163 @@ import android.content.Intent
 import android.hardware.display.DisplayManager
 import android.util.Log
 import android.widget.Toast
-import com.example.yp_qr.ApiConfig
-import com.example.yp_qr.ApiService
-import com.example.yp_qr.LocalStorage
-import com.example.yp_qr.QrResultActivity
+import androidx.compose.runtime.mutableStateOf
+import com.example.yp_qr.errors.ErrorHandler
+import com.example.yp_qr.network.ApiConfig
+import com.example.yp_qr.network.ApiService
 import com.example.yp_qr.presentation.QrPresentation
-import kotlinx.coroutines.runBlocking
+import com.example.yp_qr.screens.QrResultActivity
+import com.example.yp_qr.storage.LocalStorage
+import com.example.yp_qr.utils.ErrorUtils
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 
-class TransactionHandler(private val activity: Activity) {
+class TransactionHandler(
+    private val activity: Activity,
+    private val onSuccess: (() -> Unit)? = null // 🔵 Callback para éxito
+) {
 
     private val TAG = "TransactionHandler"
+    private var retryCount = 0
+    private val maxRetries = 3
+    private val scope = CoroutineScope(Dispatchers.Main)
+
+    val isLoading = mutableStateOf(false)
 
     fun handle() {
-        Log.i(TAG, "🟢 Iniciando manejo de transacción…")
+        Log.i(TAG, "🟢 Iniciando manejo de transacción… (retry=$retryCount)")
 
-        val intent = activity.intent
-        val extras = intent.extras
+        if (!ApiConfig.isBaseUrlConfigured()) {
+            ErrorHandler.showConfigurationError(activity) {
+                finishWithCancel()
+            }
+            return
+        }
 
-        // 1) Depuración de extras
-        Log.d(TAG, "📦 Extras del Intent:")
-        extras?.keySet()?.forEach { key ->
-            val value = extras.get(key)
-            Log.d(TAG, "🔑 $key = \"$value\" (${value?.javaClass?.name})")
-        } ?: Log.d(TAG, "❗ El Intent no contiene extras.")
+        val amount = getAmountFromIntent()
+        if (amount <= 0) {
+            showInvalidAmountError()
+            return
+        }
 
-        // 2) Obtener monto
-        val amountStr = extras?.getString("Amount")
-            ?: intent.getStringExtra("Amount")
-            ?: "0"
+        scope.launch {
+            try {
+                isLoading.value = true
+
+                val config = LocalStorage.getConfig(activity)
+                val token = ApiService.openDeviceSession(
+                    apiKey = config["api_key"] ?: "",
+                    secretKey = config["secret_key"] ?: "",
+                    deviceId = config["device.id"] ?: "",
+                    deviceName = config["device.name"] ?: "",
+                    deviceUser = config["device.user"] ?: "",
+                    groupId = config["group_id"] ?: "",
+                    context = activity
+                )
+                LocalStorage.saveToken(activity, token)
+
+                val qrEndpoint = "${ApiConfig.BASE_URL}/qr/generate/DYN"
+                val (orderId, responseJson) = ApiService.generateQrWithToken(
+                    endpoint = qrEndpoint,
+                    token = token,
+                    apiKey = config["api_key"] ?: "",
+                    secretKey = config["secret_key"] ?: "",
+                    inputValue = amount
+                )
+
+                handleQrResponse(responseJson)
+
+            } catch (e: Exception) {
+                handleTransactionError(e)
+            } finally {
+                isLoading.value = false
+            }
+        }
+    }
+
+    private fun handleQrResponse(responseJson: String) {
+        val json = JSONObject(responseJson)
+
+        if (json.has("body")) {
+            val body = json.getJSONObject("body")
+            val resultHash = body.optString("hash")
+            Log.i(TAG, "✅ QR generado: hash=$resultHash")
+
+            // 🔵 Mostrar en pantalla secundaria si existe
+            val dm = activity.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+            val displays = dm.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
+
+            if (displays.isNotEmpty()) {
+                Log.i(TAG, "🖥️ Mostrando QR en segunda pantalla")
+                val presentation = QrPresentation(activity, resultHash)
+                presentation.show()
+            } else {
+                Log.i(TAG, "📱 Mostrando QR en Activity normal")
+                val qrIntent = Intent(activity, QrResultActivity::class.java).apply {
+                    putExtra("qrHash", resultHash)
+                }
+                activity.startActivity(qrIntent)
+            }
+
+            // 🔵 Llamar al callback de éxito
+            onSuccess?.invoke()
+
+        } else {
+            val msg = json.optString("message", "Error desconocido al generar QR")
+            Log.e(TAG, "⚠️ Respuesta sin 'body': $msg")
+            Toast.makeText(activity, msg, Toast.LENGTH_LONG).show()
+            finishWithCancel()
+        }
+    }
+
+    private fun handleTransactionError(e: Exception) {
+        Log.e(TAG, "💥 Excepción durante la generación del QR", e)
+        val errorMessage = ErrorUtils.getErrorMessageFromException(e)
+
+        if (retryCount < maxRetries) {
+            retryCount++
+            ErrorHandler.showNetworkError(
+                activity = activity,
+                message = "$errorMessage\n\nIntento $retryCount de $maxRetries.",
+                onDismiss = { finishWithCancel() },
+                onRetry = { handle() }
+            )
+        } else {
+            ErrorHandler.showNetworkError(
+                activity = activity,
+                message = "Se ha alcanzado el número máximo de reintentos. Por favor, intenta más tarde.",
+                onDismiss = { finishWithCancel() }
+            )
+        }
+    }
+
+    private fun finishWithCancel() {
+        activity.setResult(Activity.RESULT_CANCELED)
+        activity.finish()
+    }
+
+    private fun getAmountFromIntent(): Double {
+        val extras = activity.intent.extras
+        val amountStr = extras?.getString("Amount") ?: activity.intent.getStringExtra("Amount") ?: "0"
         var amount = amountStr.toDoubleOrNull() ?: 0.0
-        Log.d(TAG, "💰 Monto recibido como string: $amountStr")
 
-        // Si amount inválido, buscar NetAmount dentro de DocumentData
-        if (amount <= 0.0) {
+        if (amount <= 0) {
             val documentData = extras?.getString("DocumentData") ?: ""
             val netAmountRegex = Regex("""<HeaderField Key="NetAmount">([\d.]+)</HeaderField>""")
             val match = netAmountRegex.find(documentData)
             val netAmount = match?.groups?.get(1)?.value?.toDoubleOrNull()
-            if (netAmount != null && netAmount > 0.0) {
+            if (netAmount != null && netAmount > 0) {
                 amount = netAmount
-                Log.w(TAG, "⚠️ Amount inválido, usando NetAmount del XML: $amount")
             }
         }
 
-        if (amount <= 0.0) {
-            Log.e(TAG, "❌ Monto inválido o no encontrado")
-            Toast.makeText(activity, "Monto inválido o no recibido", Toast.LENGTH_LONG).show()
-            activity.setResult(Activity.RESULT_CANCELED)
-            activity.finish()
-            return
-        }
-        Log.i(TAG, "✅ Monto final para transacción: $amount")
+        return amount
+    }
 
-        // 3) Cargar configuración segura
-        val config: Map<String, String> = runBlocking { LocalStorage.getConfig(activity) }
-        Log.d(TAG, "🔐 Configuración obtenida de LocalStorage:")
-        config.forEach { (k, v) -> Log.d(TAG, "$k = $v") }
-
-        val apiKey     = config["api_key"]     ?: ""
-        val secretKey  = config["secret_key"]  ?: ""
-        val deviceId   = config["device.id"]   ?: ""
-        val deviceName = config["device.name"] ?: ""
-        val deviceUser = config["device.user"] ?: ""
-        val groupId    = config["group_id"]    ?: ""
-
-        val qrEndpoint = "${ApiConfig.BASE_URL}/qr/generate/DYN"
-        Log.d(TAG, "🌐 Endpoint QR: $qrEndpoint")
-
-        // 4) Ejecutar llamada de red en bloque
-        runBlocking {
-            try {
-                // a) Abrir sesión de dispositivo
-                Log.i(TAG, "🔑 Abriendo sesión del dispositivo…")
-                val token = ApiService.openDeviceSession(
-                    apiKey     = apiKey,
-                    secretKey  = secretKey,
-                    deviceId   = deviceId,
-                    deviceName = deviceName,
-                    deviceUser = deviceUser,
-                    groupId    = groupId,
-                    context    = activity
-                )
-                LocalStorage.saveToken(activity, token)
-
-                // b) Generar QR
-                Log.i(TAG, "📨 Solicitando generación de QR…")
-                val (_, responseJson) = ApiService.generateQrWithToken(
-                    endpoint   = qrEndpoint,
-                    token      = token,
-                    apiKey     = apiKey,
-                    secretKey  = secretKey,
-                    inputValue = amount
-                )
-                val json = JSONObject(responseJson)
-
-                if (json.has("body")) {
-                    val body       = json.getJSONObject("body")
-                    val resultHash = body.optString("hash")
-                    Log.i(TAG, "✅ QR generado: hash=$resultHash")
-
-                    // 5) Mostrar QR en pantalla secundaria si hay
-                    val dm       = activity.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
-                    val displays = dm.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
-                    if (displays.isNotEmpty()) {
-                        Log.i(TAG, "🖥️ Pantalla secundaria detectada, usando Presentation")
-                        val presentation = QrPresentation(activity, resultHash)
-                        presentation.show()
-                    } else {
-                        Log.i(TAG, "📱 Sin pantalla secundaria, abriendo Activity fallback")
-                        val qrIntent = Intent(activity, QrResultActivity::class.java).apply {
-                            putExtra("qrHash", resultHash)
-                        }
-                        activity.startActivity(qrIntent)
-                    }
-                } else {
-                    val msg = json.optString("message", "Error desconocido al generar QR")
-                    Log.e(TAG, "⚠️ Respuesta sin 'body': $msg")
-                    Toast.makeText(activity, msg, Toast.LENGTH_LONG).show()
-                }
-
-            } catch (e: Exception) {
-                Log.e(TAG, "💥 Excepción al generar QR", e)
-                Toast.makeText(activity, "Error: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
-            } finally {
-                Log.i(TAG, "🛑 Finalizando Activity principal.")
-                activity.finish()
-            }
-        }
+    private fun showInvalidAmountError() {
+        Toast.makeText(activity, "Monto inválido o no recibido", Toast.LENGTH_LONG).show()
+        finishWithCancel()
     }
 }

@@ -1,13 +1,12 @@
-package com.example.yp_qr
+package com.example.yp_qr.storage
 
 import android.content.Context
-import android.content.SharedPreferences
 
 object LocalStorage {
 
     private const val PREFS_NAME = "config_prefs"
 
-    // Función para guardar toda la configuración
+    // Guardar la configuración
     fun saveConfig(
         context: Context,
         endpoint: String,
@@ -30,7 +29,7 @@ object LocalStorage {
             .apply()
     }
 
-    // Función para obtener toda la configuración guardada
+    // Obtener configuración guardada
     fun getConfig(context: Context): Map<String, String> {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         return mapOf(
@@ -44,7 +43,15 @@ object LocalStorage {
         )
     }
 
-    // Función para borrar la configuración
+    // ❗✅ Nueva función para guardar el token
+    fun saveToken(context: Context, token: String) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putString("device_token", token)
+            .apply()
+    }
+
+    // Limpiar todo
     fun clear(context: Context) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().clear().apply()

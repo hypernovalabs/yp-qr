@@ -1,4 +1,4 @@
-package com.example.yp_qr
+package com.example.yp_qr.screens
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -13,7 +13,15 @@ class QrResultActivity : ComponentActivity() {
         val hash = intent.getStringExtra("qrHash") ?: ""
 
         setContent {
-            QrResultScreen(date = date, transactionId = transactionId, hash = hash)
+            QrResultScreen(
+                date = date,
+                transactionId = transactionId,
+                hash = hash,
+                onCancelSuccess = {
+                    // 🔵 Aquí defines qué pasa cuando se cancela el pago
+                    finish() // Por ahora, simplemente cerrar la pantalla
+                }
+            )
         }
     }
 }

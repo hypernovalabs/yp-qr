@@ -2,7 +2,8 @@ package com.example.yp_qr.intenthandlers
 
 import android.app.Activity
 import android.content.Intent
-import com.example.yp_qr.LocalStorage
+import com.example.yp_qr.storage.LocalStorage
+import com.example.yp_qr.errors.ErrorHandler // ✅ Importamos ErrorHandler
 import kotlinx.coroutines.runBlocking
 import org.xmlpull.v1.XmlPullParserFactory
 
@@ -12,16 +13,22 @@ class InitializeHandler(private val activity: Activity) {
         val parametersXml = activity.intent.getStringExtra("Parameters")
 
         if (parametersXml.isNullOrBlank()) {
-            fail("No se recibieron parámetros desde HioPosCloud")
+            // No finalizar si no vienen parámetros válidos
+            ErrorHandler.showConfigurationError(activity) {
+                val result = Intent("icg.actions.electronicpayment.tefbanesco.INITIALIZE")
+                result.putExtra("ErrorMessage", "No se recibieron parámetros")
+                activity.setResult(Activity.RESULT_CANCELED, result)
+                // NO hacemos finish aquí
+            }
             return
         }
 
         try {
             val configMap = parseXml(parametersXml)
-
             runBlocking {
                 LocalStorage.saveConfig(
                     context = activity,
+                    endpoint = configMap["endpoint"] ?: "",
                     apiKey = configMap["api_key"] ?: "",
                     secretKey = configMap["secret_key"] ?: "",
                     deviceId = configMap["device_id"] ?: "",
@@ -33,19 +40,20 @@ class InitializeHandler(private val activity: Activity) {
 
             val result = Intent("icg.actions.electronicpayment.tefbanesco.INITIALIZE")
             activity.setResult(Activity.RESULT_OK, result)
+            activity.finish() // ✅ Ahora sí cerramos solo si todo salió bien
 
         } catch (e: Exception) {
             fail("Error al parsear configuración: ${e.message}")
-        } finally {
-            activity.finish()
         }
     }
 
     private fun fail(message: String) {
-        val result = Intent("icg.actions.electronicpayment.tefbanesco.INITIALIZE")
-        result.putExtra("ErrorMessage", message)
-        activity.setResult(Activity.RESULT_CANCELED, result)
-        activity.finish()
+        ErrorHandler.showConfigurationError(activity) {
+            val result = Intent("icg.actions.electronicpayment.tefbanesco.INITIALIZE")
+            result.putExtra("ErrorMessage", message)
+            activity.setResult(Activity.RESULT_CANCELED, result)
+            activity.finish()
+        }
     }
 
     private fun parseXml(xml: String): Map<String, String> {

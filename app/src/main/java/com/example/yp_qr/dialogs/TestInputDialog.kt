@@ -1,5 +1,6 @@
-package com.example.yp_qr
+package com.example.yp_qr.dialogs
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -11,9 +12,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.example.yp_qr.network.ApiConfig
+import com.example.yp_qr.network.ApiService
+import com.example.yp_qr.storage.LocalStorage
 import kotlinx.coroutines.launch
 import org.json.JSONObject
-
 
 @Composable
 fun TestInputDialog(
@@ -31,9 +34,8 @@ fun TestInputDialog(
     var showErrorDialog by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
 
-    // Endpoints
-    val deviceEndpoint = "${ApiConfig.BASE_URL}/session/device"
-    val qrEndpoint = "${ApiConfig.BASE_URL}/qr/generate/DYN"
+    val deviceEndpoint = ApiConfig.BASE_URL.trimEnd('/') + "/session/device"
+    val qrEndpoint = ApiConfig.BASE_URL.trimEnd('/') + "/qr/generate/DYN"
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -63,13 +65,8 @@ fun TestInputDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                Row(
-                    horizontalArrangement = Arrangement.End,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("Cancelar")
-                    }
+                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                    TextButton(onClick = onDismiss) { Text("Cancelar") }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = {
@@ -83,10 +80,7 @@ fun TestInputDialog(
                         enabled = !loading
                     ) {
                         if (loading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp
-                            )
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                         } else {
                             Text("Confirmar")
                         }
@@ -102,28 +96,15 @@ fun TestInputDialog(
             val stored = LocalStorage.getConfig(context)
             config.putAll(stored)
         }
+
         AlertDialog(
             onDismissRequest = { showConfirmDialog = false },
             title = { Text("Confirmar Envío al Endpoint") },
             text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                ) {
+                Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
                     Text("Se enviará una consulta a:")
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(deviceEndpoint, style = MaterialTheme.typography.bodyMedium)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text("🔐 Headers:", style = MaterialTheme.typography.labelMedium)
-                    Text("api-key: ${config["api_key"] ?: "-"}")
-                    Text("secret-key: ${config["secret_key"] ?: "-"}")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("📦 Body:", style = MaterialTheme.typography.labelMedium)
-                    Text("device.id: ${config["device.id"]}")
-                    Text("device.name: ${config["device.name"]}")
-                    Text("device.user: ${config["device.user"]}")
-                    Text("group_id: ${config["group_id"]}")
                 }
             },
             confirmButton = {
@@ -132,17 +113,32 @@ fun TestInputDialog(
                     loading = true
                     scope.launch {
                         try {
-                            // Llama a openDeviceSession pasando el contexto
+                            // Validar que todos los campos estén completos
+                            if (config.values.any { it.isNullOrBlank() }) {
+                                throw Exception("⚠️ Faltan datos en la configuración. Completa todos los campos antes de enviar.")
+                            }
+
+                            Log.d("TestInputDialog", "====== Enviando sesión ======")
+                            Log.d("TestInputDialog", "🔗 Endpoint: $deviceEndpoint")
+                            Log.d("TestInputDialog", "🔐 Headers: api-key=${config["api_key"]}, secret-key=${config["secret_key"]}")
+                            Log.d("TestInputDialog", "📦 Body: ${config["device.id"]}, ${config["device.name"]}, ${config["device.user"]}, ${config["group_id"]}")
+                            Log.d("TestInputDialog", "=================================")
+
                             val token = ApiService.openDeviceSession(
-                                apiKey = config["api_key"] ?: "",
-                                secretKey = config["secret_key"] ?: "",
-                                deviceId = config["device.id"] ?: "",
-                                deviceName = config["device.name"] ?: "",
-                                deviceUser = config["device.user"] ?: "",
-                                groupId = config["group_id"] ?: "",
+                                apiKey = config["api_key"]!!,
+                                secretKey = config["secret_key"]!!,
+                                deviceId = config["device.id"]!!,
+                                deviceName = config["device.name"]!!,
+                                deviceUser = config["device.user"]!!,
+                                groupId = config["group_id"]!!,
                                 context = context
                             )
-                            // Guarda el token obtenido en LocalStorage
+
+                            if (token.isBlank() || token.startsWith("Error") || token.startsWith("Excepción")) {
+                                throw Exception("❌ Token inválido: $token")
+                            }
+
+                            Log.d("TestInputDialog", "🔑 Token recibido: $token")
                             LocalStorage.saveToken(context, token)
 
                             Toast.makeText(context, "🔐 Token generado correctamente", Toast.LENGTH_SHORT).show()
@@ -150,10 +146,12 @@ fun TestInputDialog(
                             val (orderId, responseJson) = ApiService.generateQrWithToken(
                                 endpoint = qrEndpoint,
                                 token = token,
-                                apiKey = config["api_key"] ?: "",
-                                secretKey = config["secret_key"] ?: "",
+                                apiKey = config["api_key"]!!,
+                                secretKey = config["secret_key"]!!,
                                 inputValue = input.toDouble()
                             )
+
+                            Log.d("TestInputDialog", "📩 Respuesta QR: $responseJson")
 
                             val json = JSONObject(responseJson)
                             if (json.has("body")) {
@@ -168,6 +166,7 @@ fun TestInputDialog(
                                 showErrorDialog = true
                             }
                         } catch (e: Exception) {
+                            Log.e("TestInputDialog", "🚨 Error en el flujo: ${e.localizedMessage}", e)
                             errorMessage = e.localizedMessage ?: "Error desconocido"
                             showErrorDialog = true
                         } finally {

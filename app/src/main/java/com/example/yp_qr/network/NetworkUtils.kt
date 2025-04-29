@@ -1,5 +1,5 @@
 // ✅ NetworkUtils.kt
-package com.example.yp_qr
+package com.example.yp_qr.network
 
 import android.content.Context
 import android.net.ConnectivityManager

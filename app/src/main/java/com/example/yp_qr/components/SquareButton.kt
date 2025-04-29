@@ -1,4 +1,4 @@
-package com.example.yp_qr
+package com.example.yp_qr.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

@@ -1,6 +1,7 @@
-package com.example.yp_qr
+package com.example.yp_qr.network
 
 import android.content.Context
+import com.example.yp_qr.storage.LocalStorage
 
 object ConfigManager {
 

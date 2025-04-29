@@ -16,6 +16,7 @@ androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name  = "lifecy
 androidx-lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name  = "lifecycle-viewmodel-ktx",  version.ref = "lifecycleRuntimeKtx"  }
 # …el resto de tus aliases…
 
+material = { module = "com.google.android.material:material", version = "1.11.0" }
 
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
