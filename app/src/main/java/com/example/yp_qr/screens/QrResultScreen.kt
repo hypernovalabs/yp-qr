@@ -36,11 +36,11 @@ import java.text.NumberFormat
 import java.util.Locale
 
 // 🎨 Paleta de colores
-val PrimaryColor     = ComposeColor(0xFF1E88E5)
-val PrimaryDark      = ComposeColor(0xFF1565C0)
-val AccentColor      = ComposeColor(0xFF42A5F5)
-val ErrorColor       = ComposeColor(0xFFFF7043)
-val LightBackground  = ComposeColor(0xFFF1F8FF)
+private val PrimaryColor     = ComposeColor(0xFF1E88E5)
+private val PrimaryDark      = ComposeColor(0xFF1565C0)
+private val AccentColor      = ComposeColor(0xFF42A5F5)
+private val ErrorColor       = ComposeColor(0xFFFF7043)
+private val LightBackground  = ComposeColor(0xFFF1F8FF)
 
 @Composable
 fun QrResultScreen(
@@ -49,7 +49,7 @@ fun QrResultScreen(
     hash: String,
     amount: String,
     onCancelSuccess: () -> Unit,
-    onPaymentSuccess: () -> Unit  // nuevo callback para pago exitoso
+    onPaymentSuccess: () -> Unit
 ) {
     // Log inicial
     LaunchedEffect(Unit) {
@@ -63,18 +63,24 @@ fun QrResultScreen(
         NumberFormat.getCurrencyInstance(Locale.US).format(value)
     }
 
-    // Obtener credenciales
+    // Credenciales
     val context = LocalContext.current
-    val config = LocalStorage.getConfig(context)
+    val config  = LocalStorage.getConfig(context)
     val token     = config["device_token"] ?: ""
     val apiKey    = config["api_key"]      ?: ""
     val secretKey = config["secret_key"]   ?: ""
 
-    // Estado UI
-    val scrollState = rememberScrollState()
-    val coroutineScope = rememberCoroutineScope()
-    var isCancelling by remember { mutableStateOf(false) }
-    var cancelError by remember { mutableStateOf<String?>(null) }
+    // Estados de UI
+    val scrollState      = rememberScrollState()
+    val coroutineScope   = rememberCoroutineScope()
+    var isCancelling     by remember { mutableStateOf(false) }
+    var cancelError      by remember { mutableStateOf<String?>(null) }
+    var currentStatus    by remember { mutableStateOf("") }
+
+    // Indicador de polling activo
+    val isCheckingStatus = remember(currentStatus, isCancelling) {
+        currentStatus == "PENDING" && !isCancelling
+    }
 
     // Polling de estado de transacción
     LaunchedEffect(transactionId) {
@@ -91,8 +97,9 @@ fun QrResultScreen(
                     apiKey = apiKey,
                     secretKey = secretKey
                 )
-                val body = JSONObject(resp).optJSONObject("body")
+                val body   = JSONObject(resp).optJSONObject("body")
                 val status = body?.optString("status") ?: ""
+                currentStatus = status
                 Timber.d("Polled status=%s for txnId=%s", status, transactionId)
                 if (status == "COMPLETED") {
                     Timber.i("Payment completed for txnId=%s", transactionId)
@@ -102,7 +109,7 @@ fun QrResultScreen(
             } catch (e: Exception) {
                 Timber.e(e, "Error polling transaction status for txnId=%s", transactionId)
             }
-            delay(5_000) // espera 5 segundos antes de la siguiente llamada
+            delay(5_000)
         }
     }
 
@@ -125,8 +132,7 @@ fun QrResultScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             HeaderSection()
-
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(Modifier.height(12.dp))
 
             Text(
                 text = "Monto a pagar: $formattedAmount",
@@ -139,11 +145,11 @@ fun QrResultScreen(
                     .padding(horizontal = 16.dp)
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(Modifier.height(24.dp))
 
             QrCodeWithBorder(hash = hash, size = 260, statusColor = PrimaryColor)
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(Modifier.height(24.dp))
 
             Text(
                 text = "Escanea este código para realizar tu pago",
@@ -156,19 +162,41 @@ fun QrResultScreen(
                     .padding(horizontal = 32.dp)
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            // ————— Indicador de verificación de estado —————
+            if (isCheckingStatus) {
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    CircularProgressIndicator(
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(20.dp),
+                        color = ComposeColor.White
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "Verificando estado...",
+                        color = ComposeColor.White,
+                        fontSize = 14.sp
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(32.dp))
 
             // ————— Botón Cancelar —————
             Button(
                 onClick = {
-                    Timber.d("✋ Cancel button clicked for txnId=%s", transactionId)
                     coroutineScope.launch {
+                        if (currentStatus != "PENDING") {
+                            cancelError = "No se puede cancelar. Estado: $currentStatus"
+                            return@launch
+                        }
                         isCancelling = true
-                        cancelError = null
-
-                        Timber.d("🔄 Calling cancelTransaction api with txnId=%s, token=%s, apiKey=%s",
-                            transactionId, token, apiKey)
-
+                        cancelError  = null
+                        Timber.d("✋ Cancel clicked for txnId=%s", transactionId)
                         val result = try {
                             ApiService.cancelTransaction(
                                 transactionId = transactionId,
@@ -182,15 +210,10 @@ fun QrResultScreen(
                             cancelError = "Exception: ${e.localizedMessage}"
                             return@launch
                         }
-
-                        Timber.d("📥 cancelTransaction result=%s for txnId=%s", result, transactionId)
                         isCancelling = false
-
                         if (result.contains("Error") || result.contains("Excepción")) {
-                            Timber.w("⚠️ cancelTransaction returned error payload for txnId=%s", transactionId)
                             cancelError = "Error al cancelar el pago: $result"
                         } else {
-                            Timber.i("🎉 cancelTransaction successful for txnId=%s", transactionId)
                             onCancelSuccess()
                         }
                     }
@@ -210,7 +233,6 @@ fun QrResultScreen(
                 )
             }
 
-            // Mostrar error de cancelación
             cancelError?.let { error ->
                 Text(
                     text = error,
@@ -227,7 +249,7 @@ fun QrResultScreen(
 }
 
 @Composable
-fun HeaderSection() {
+private fun HeaderSection() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -244,21 +266,21 @@ fun HeaderSection() {
 }
 
 @Composable
-fun QrCodeWithBorder(hash: String, size: Int, statusColor: ComposeColor) {
+private fun QrCodeWithBorder(hash: String, size: Int, statusColor: ComposeColor) {
     Card(
         modifier = Modifier
             .size((size + 32).dp)
             .padding(4.dp),
-        colors = CardDefaults.cardColors(containerColor = LightBackground),
         shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = LightBackground),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Box(
-            modifier = Modifier
+            Modifier
                 .fillMaxSize()
                 .padding(12.dp)
                 .background(
-                    brush = Brush.radialGradient(
+                    Brush.radialGradient(
                         colors = listOf(statusColor.copy(alpha = 0.1f), LightBackground)
                     )
                 ),
@@ -270,7 +292,7 @@ fun QrCodeWithBorder(hash: String, size: Int, statusColor: ComposeColor) {
 }
 
 @Composable
-fun QrCode(hash: String, size: Int) {
+private fun QrCode(hash: String, size: Int) {
     val qrBitmap = remember(hash) { generateQRCode(hash, size, size) }
     if (qrBitmap != null) {
         Image(
@@ -300,18 +322,16 @@ fun QrCode(hash: String, size: Int) {
     }
 }
 
-fun generateQRCode(text: String, width: Int, height: Int): Bitmap? {
+private fun generateQRCode(text: String, width: Int, height: Int): Bitmap? {
     return try {
         val matrix: BitMatrix = MultiFormatWriter().encode(
             text, BarcodeFormat.QR_CODE, width, height
         )
-        val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        for (x in 0 until width) {
-            for (y in 0 until height) {
-                bmp.setPixel(x, y, if (matrix.get(x, y)) Color.BLACK else Color.WHITE)
+        Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
+            for (x in 0 until width) for (y in 0 until height) {
+                setPixel(x, y, if (matrix.get(x, y)) Color.BLACK else Color.WHITE)
             }
         }
-        bmp
     } catch (e: Exception) {
         Timber.e(e, "Error generating QR bitmap")
         null

@@ -31,77 +31,72 @@ class TransactionHandler(
     private val scope = CoroutineScope(Dispatchers.Main)
 
     fun handle() {
-        // 📥 Log de parámetros entrantes
         Timber.d("🟢 TransactionHandler.handle invoked with action=%s, extras=%s", activity.intent.action, activity.intent.extras)
 
         if (!ApiConfig.isBaseUrlConfigured()) {
-            ErrorHandler.showConfigurationError(activity) {
-                finishWithCancel()
-            }
+            ErrorHandler.showConfigurationError(activity) { finishWithCancel() }
             return
         }
 
-        // Extraer y validar monto
         val amountValue = getAmountFromIntent()
         if (amountValue <= 0) {
             showInvalidAmountError()
             return
         }
 
-        // Extraer fecha si viene en el Intent
         val dateValue = activity.intent.extras?.getString("date") ?: ""
-
-        // 📥 Log de parámetros procesados
         Timber.d("📥 Parsed parameters: date=%s, amount=%s", dateValue, amountValue)
 
         scope.launch {
             try {
                 isLoading.value = true
-
-                // Abrir sesión y guardar token
-                val config = LocalStorage.getConfig(activity)
-                val token = ApiService.openDeviceSession(
-                    apiKey = config["api_key"] ?: "",
-                    secretKey = config["secret_key"] ?: "",
-                    deviceId = config["device.id"] ?: "",
-                    deviceName = config["device.name"] ?: "",
-                    deviceUser = config["device.user"] ?: "",
-                    groupId = config["group_id"] ?: "",
-                    context = activity
-                )
+                val token = openSession(activity)
                 LocalStorage.saveToken(activity, token)
-
-                // 📥 Log del token de sesión
-                Timber.d("⚙️ Session opened, token=%s", token)
-
-                // Construir endpoint de QR
-                val qrEndpoint = "${ApiConfig.BASE_URL}/qr/generate/DYN"
-                // 📥 Log de parámetros para generar QR
-                Timber.d(
-                    "⚙️ Generating QR with endpoint=%s, apiKey=%s, secretKey=%s, inputValue=%s",
-                    qrEndpoint,
-                    config["api_key"],
-                    config["secret_key"],
-                    amountValue
-                )
-
-                val (orderId, responseJson) = ApiService.generateQrWithToken(
-                    endpoint = qrEndpoint,
-                    token = token,
-                    apiKey = config["api_key"] ?: "",
-                    secretKey = config["secret_key"] ?: "",
-                    inputValue = amountValue
-                )
-
-                // Manejar la respuesta y lanzar la Activity
+                val (orderId, responseJson) = generateQr(token, amountValue)
                 handleQrResponse(orderId, responseJson, dateValue, amountValue)
-
             } catch (e: Exception) {
                 handleTransactionError(e)
             } finally {
                 isLoading.value = false
             }
         }
+    }
+
+    /**
+     * Inicia una sesión de dispositivo y retorna el token.
+     */
+    private suspend fun openSession(context: Context): String {
+        val config = LocalStorage.getConfig(context)
+        val token = ApiService.openDeviceSession(
+            apiKey = config["api_key"] ?: "",
+            secretKey = config["secret_key"] ?: "",
+            deviceId = config["device.id"] ?: "",
+            deviceName = config["device.name"] ?: "",
+            deviceUser = config["device.user"] ?: "",
+            groupId = config["group_id"] ?: "",
+            context = context
+        )
+        Timber.d("⚙️ Session opened, token=%s", token)
+        return token
+    }
+
+    /**
+     * Genera el QR con el token de sesión.
+     */
+    private suspend fun generateQr(token: String, amountValue: Double): Pair<String, String> {
+        val config = LocalStorage.getConfig(activity)
+        val qrEndpoint = "${ApiConfig.BASE_URL}/qr/generate/DYN"
+        Timber.d(
+            "⚙️ Generating QR with endpoint=%s, apiKey=%s, secretKey=%s, inputValue=%s",
+            qrEndpoint, config["api_key"], config["secret_key"], amountValue
+        )
+        return ApiService.generateQrWithToken(
+            endpoint = qrEndpoint,
+            token = token,
+            apiKey = config["api_key"] ?: "",
+            secretKey = config["secret_key"] ?: "",
+            inputValue = amountValue
+        )
     }
 
     private fun handleQrResponse(
@@ -111,7 +106,6 @@ class TransactionHandler(
         amountValue: Double
     ) {
         val json = JSONObject(responseJson)
-
         if (json.has("body")) {
             val body = json.getJSONObject("body")
             val resultHash = body.optString("hash")
@@ -133,9 +127,7 @@ class TransactionHandler(
                 }
                 activity.startActivity(qrIntent)
             }
-
             onSuccess?.invoke()
-
         } else {
             val msg = json.optString("message", "Error desconocido al generar QR")
             Timber.e("⚠️ Response missing 'body': %s", msg)
@@ -147,7 +139,6 @@ class TransactionHandler(
     private fun handleTransactionError(e: Exception) {
         Timber.e(e, "💥 Exception during QR generation")
         val errorMessage = ErrorUtils.getErrorMessageFromException(e)
-
         if (retryCount < maxRetries) {
             retryCount++
             ErrorHandler.showNetworkError(
@@ -171,26 +162,22 @@ class TransactionHandler(
     }
 
     private fun getAmountFromIntent(): Double {
-        val extras    = activity.intent.extras
+        val extras = activity.intent.extras
         val amountStr = extras?.getString("Amount")
             ?: activity.intent.getStringExtra("Amount")
             ?: "0"
         var amount = amountStr.toDoubleOrNull() ?: 0.0
-
-        // Ajuste: si el monto viene en centavos (>=100), convertir a unidades
         if (amount >= 100) {
             Timber.d("↔️ Ajustando amount de $amount centavos a ${amount / 100}")
             amount /= 100.0
         }
-
         if (amount <= 0) {
             val documentData = extras?.getString("DocumentData") ?: ""
-            val netAmountRegex = Regex("""<HeaderField Key=\"NetAmount\">([\d.]+)</HeaderField>""")
+            val netAmountRegex = Regex("""<HeaderField Key=\\"NetAmount\\">([\d.]+)</HeaderField>""")
             val match = netAmountRegex.find(documentData)
             val netAmount = match?.groups?.get(1)?.value?.toDoubleOrNull()
             if (netAmount != null && netAmount > 0) amount = netAmount
         }
-
         return amount
     }
 

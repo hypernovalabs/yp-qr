@@ -3,7 +3,6 @@ package com.example.tefbanesco.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.*
@@ -16,7 +15,6 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.tefbanesco.components.SquareButton
 import com.example.tefbanesco.dialogs.ConfigDialog
-import com.example.tefbanesco.dialogs.TestInputDialog
 import com.example.tefbanesco.network.NetworkUtils
 import kotlinx.coroutines.launch
 
@@ -27,7 +25,6 @@ fun MainScreen(navController: NavController) {
     val snackbarHostState = remember { SnackbarHostState() }
 
     var showConfigDialog by remember { mutableStateOf(false) }
-    var showTestDialog by remember { mutableStateOf(false) }
 
     val isOnline = remember { mutableStateOf(NetworkUtils.isConnected(context)) }
 
@@ -40,6 +37,7 @@ fun MainScreen(navController: NavController) {
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            // Estado de conectividad en la esquina superior derecha
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -53,45 +51,21 @@ fun MainScreen(navController: NavController) {
                 )
             }
 
+            // Botón central de configuración
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(32.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    SquareButton(
-                        text = "Test",
-                        icon = Icons.Default.PlayArrow,
-                        onClick = { showTestDialog = true }
-                    )
-                    SquareButton(
-                        text = "Configuración",
-                        icon = Icons.Default.Build,
-                        onClick = { showConfigDialog = true }
-                    )
-                }
+                SquareButton(
+                    text = "Configuración",
+                    icon = Icons.Default.Build,
+                    onClick = { showConfigDialog = true }
+                )
             }
 
+            // Mostrar diálogo de configuración
             if (showConfigDialog) {
                 ConfigDialog(onDismiss = { showConfigDialog = false })
-            }
-
-            if (showTestDialog) {
-                TestInputDialog(
-                    onDismiss = { showTestDialog = false },
-                    onSubmit = { value ->
-                        scope.launch {
-                            snackbarHostState.showSnackbar("Número ingresado: $value")
-                        }
-                        showTestDialog = false
-                    },
-                    onQrResult = { date, transactionId, hash ->
-                        // Aquí se navega a la pantalla de resultado del QR pasando los parámetros
-                        navController.navigate("qrResult/$date/$transactionId/$hash")
-                    }
-                )
             }
         }
     }

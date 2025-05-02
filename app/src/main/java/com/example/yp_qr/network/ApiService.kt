@@ -30,30 +30,31 @@ object ApiService {
                 }
             }
 
-            body?.let { json ->
-                connection.outputStream.use { it.write(json.toString().toByteArray()) }
+            body?.let {
+                connection.outputStream.use { os ->
+                    os.write(it.toString().toByteArray())
+                }
             }
 
             val responseCode = connection.responseCode
             val responseBody = try {
                 connection.inputStream.bufferedReader().use(BufferedReader::readText)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
                 connection.errorStream?.bufferedReader()?.use(BufferedReader::readText)
                     ?: "No response body"
             }
 
-            Log.d("ApiService", "🔵 [$method] URL: $urlString")
+            Log.d("ApiService", "🔵 [$method] $urlString")
             Log.d("ApiService", "🛡️ Headers: $headers")
-            body?.let { Log.d("ApiService", "📦 Body enviado: ${it.toString(4)}") }
-            Log.d("ApiService", "🔵 Código HTTP: $responseCode")
-            Log.d("ApiService", "📜 Respuesta: $responseBody")
+            body?.let { Log.d("ApiService", "📦 Body: ${it.toString(4)}") }
+            Log.d("ApiService", "🔵 Code: $responseCode")
+            Log.d("ApiService", "📜 Resp: $responseBody")
 
             if (responseCode in 200..299) responseBody
             else throw Exception("HTTP $responseCode: $responseBody")
-
         } catch (e: Exception) {
-            Log.e("ApiService", "💥 Error en [$method] $urlString", e)
-            throw Exception("Excepción en [$method] $urlString: ${e.localizedMessage ?: e.message}")
+            Log.e("ApiService", "💥 Error in [$method] $urlString", e)
+            throw Exception("Excepción en [$method] $urlString: ${e.localizedMessage}")
         } finally {
             connection?.disconnect()
         }
@@ -84,25 +85,21 @@ object ApiService {
             method = "POST",
             headers = mapOf(
                 "Content-Type" to "application/json",
-                "api-key"     to apiKey,
-                "secret-key"  to secretKey
+                "api-key" to apiKey,
+                "secret-key" to secretKey
             ),
             body = body
         )
 
         return try {
-            JSONObject(response)
-                .getJSONObject("body")
-                .optString("token", "")
+            val json = JSONObject(response)
+            json.optJSONObject("body")?.optString("token") ?: ""
         } catch (e: Exception) {
-            Log.e("ApiService", "💥 Error parseando token", e)
+            Log.e("ApiService", "💥 Error parsing token", e)
             ""
         }
     }
 
-    /**
-     * Genera un QR y devuelve el `transactionId` real que devuelve Yappy + el JSON completo.
-     */
     suspend fun generateQrWithToken(
         endpoint: String,
         token: String,
@@ -112,8 +109,8 @@ object ApiService {
     ): Pair<String, String> {
         val orderId = "ORD-${System.currentTimeMillis()}"
         val subTotal = inputValue
-        val tax      = (subTotal * 0.07 * 100).toInt() / 100.0
-        val total    = subTotal + tax
+        val tax = (subTotal * 0.07 * 100).toInt() / 100.0
+        val total = subTotal + tax
 
         val body = JSONObject().apply {
             put("body", JSONObject().apply {
@@ -129,43 +126,35 @@ object ApiService {
             })
         }
 
-        val bearer = "Bearer $token"
         val response = makeRequest(
             urlString = endpoint,
-            method    = "POST",
-            headers   = mapOf(
-                "Content-Type"  to "application/json",
-                "Authorization" to bearer,
-                "api-key"       to apiKey,
-                "secret-key"    to secretKey
+            method = "POST",
+            headers = mapOf(
+                "Content-Type" to "application/json",
+                "Authorization" to "Bearer $token",
+                "api-key" to apiKey,
+                "secret-key" to secretKey
             ),
             body = body
         )
 
-        // ➜ Aquí extraemos el transactionId real
-        val bodyObj     = JSONObject(response).getJSONObject("body")
-        val yappyTxnId  = bodyObj.optString("transactionId", "")
-        return Pair(yappyTxnId, response)
+        return Pair(orderId, response)
     }
 
-    /**
-     * Anula usando el `transactionId` real.
-     */
     suspend fun cancelTransaction(
         transactionId: String,
         token: String,
         apiKey: String,
         secretKey: String
     ): String {
-        val bearer = "Bearer $token"
         return makeRequest(
             urlString = "${ApiConfig.BASE_URL}/transaction/$transactionId",
-            method    = "PUT",
-            headers   = mapOf(
-                "Content-Type"  to "application/json",
-                "Authorization" to bearer,
-                "api-key"       to apiKey,
-                "secret-key"    to secretKey
+            method = "PUT",
+            headers = mapOf(
+                "Content-Type" to "application/json",
+                "Authorization" to "Bearer $token",
+                "api-key" to apiKey,
+                "secret-key" to secretKey
             )
         )
     }
@@ -176,15 +165,34 @@ object ApiService {
         apiKey: String,
         secretKey: String
     ): String {
-        val bearer = "Bearer $token"
         return makeRequest(
             urlString = "${ApiConfig.BASE_URL}/transaction/$transactionId",
-            method    = "GET",
-            headers   = mapOf(
-                "Content-Type"  to "application/json",
-                "Authorization" to bearer,
-                "api-key"       to apiKey,
-                "secret-key"    to secretKey
+            method = "GET",
+            headers = mapOf(
+                "Content-Type" to "application/json",
+                "Authorization" to "Bearer $token",
+                "api-key" to apiKey,
+                "secret-key" to secretKey
+            )
+        )
+    }
+
+    /**
+     * Cierra la sesión de dispositivo (DELETE /session/device)
+     */
+    suspend fun closeDeviceSession(
+        token: String,
+        apiKey: String,
+        secretKey: String
+    ): String {
+        return makeRequest(
+            urlString = "${ApiConfig.BASE_URL}/session/device",
+            method = "DELETE",
+            headers = mapOf(
+                "Content-Type" to "application/json",
+                "Authorization" to "Bearer $token",
+                "api-key" to apiKey,
+                "secret-key" to secretKey
             )
         )
     }
