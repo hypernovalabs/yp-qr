@@ -5,7 +5,9 @@ import android.graphics.Color
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,16 +25,17 @@ import androidx.compose.ui.unit.sp
 import com.example.tefbanesco.R
 import com.example.tefbanesco.network.ApiService
 import com.example.tefbanesco.storage.LocalStorage
-import kotlinx.coroutines.launch
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix
+import kotlinx.coroutines.launch
+import timber.log.Timber
 
 // 🎨 Paleta de colores
-val PrimaryColor = ComposeColor(0xFF1E88E5)
-val PrimaryDark = ComposeColor(0xFF1565C0)
-val AccentColor = ComposeColor(0xFF42A5F5)
-val ErrorColor = ComposeColor(0xFFFF7043)
+val PrimaryColor     = ComposeColor(0xFF1E88E5)
+val PrimaryDark      = ComposeColor(0xFF1565C0)
+val AccentColor      = ComposeColor(0xFF42A5F5)
+val ErrorColor       = ComposeColor(0xFFFF7043)
 val LightBackground = ComposeColor(0xFFF1F8FF)
 
 @Composable
@@ -40,9 +43,16 @@ fun QrResultScreen(
     date: String,
     transactionId: String,
     hash: String,
-    amount: String,                      // Nuevo parámetro para el monto
-    onCancelSuccess: () -> Unit         // 🔵 Callback para cuando se cancele exitosamente
+    amount: String,
+    onCancelSuccess: () -> Unit
 ) {
+    // Sólo un log inicial
+    LaunchedEffect(Unit) {
+        Timber.d("▶ Showing QrResultScreen date=%s, txnId=%s, hash=%s, amount=%s",
+            date, transactionId, hash, amount)
+    }
+
+    val scrollState = rememberScrollState()
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var isCancelling by remember { mutableStateOf(false) }
@@ -52,20 +62,24 @@ fun QrResultScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(
-                Brush.verticalGradient(listOf(AccentColor, PrimaryDark), startY = 0f, endY = 1500f)
+                Brush.verticalGradient(
+                    colors = listOf(AccentColor, PrimaryDark),
+                    startY = 0f,
+                    endY = Float.POSITIVE_INFINITY
+                )
             )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(scrollState)
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             HeaderSection()
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Mostrar el monto de pago
             Text(
                 text = "Monto a pagar: $amount",
                 fontSize = 20.sp,
@@ -79,7 +93,7 @@ fun QrResultScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            QrCodeWithBorder(hash = hash, size = 300, statusColor = PrimaryColor)
+            QrCodeWithBorder(hash = hash, size = 260, statusColor = PrimaryColor)
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -96,8 +110,10 @@ fun QrResultScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
+            // ————— Botón Cancelar —————
             Button(
                 onClick = {
+                    Timber.d("✋ Cancel button clicked for txnId=%s", transactionId)
                     coroutineScope.launch {
                         isCancelling = true
                         cancelError = null
@@ -107,29 +123,40 @@ fun QrResultScreen(
                         val apiKey = config["api_key"] ?: ""
                         val secretKey = config["secret_key"] ?: ""
 
-                        val result = ApiService.cancelTransaction(
-                            transactionId = transactionId,
-                            token = token,
-                            apiKey = apiKey,
-                            secretKey = secretKey
-                        )
+                        Timber.d("🔄 Calling cancelTransaction api with txnId=%s, token=%s, apiKey=%s",
+                            transactionId, token, apiKey)
 
+                        val result = try {
+                            ApiService.cancelTransaction(
+                                transactionId = transactionId,
+                                token = token,
+                                apiKey = apiKey,
+                                secretKey = secretKey
+                            )
+                        } catch (e: Exception) {
+                            Timber.e(e, "❌ cancelTransaction threw")
+                            isCancelling = false
+                            cancelError = "Exception: ${e.localizedMessage}"
+                            return@launch
+                        }
+
+                        Timber.d("📥 cancelTransaction result=%s", result)
                         isCancelling = false
 
                         if (result.contains("Error") || result.contains("Excepción")) {
+                            Timber.w("⚠️ cancelTransaction returned error payload")
                             cancelError = "Error al cancelar el pago: $result"
                         } else {
-                            onCancelSuccess() // 🚀 Redirigir al Success de Cancelación
+                            Timber.i("🎉 cancelTransaction successful for txnId=%s", transactionId)
+                            onCancelSuccess()
                         }
                     }
                 },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = ComposeColor.White  // fondo blanco para mejor contraste
-                ),
+                colors = ButtonDefaults.buttonColors(containerColor = ComposeColor.White),
                 enabled = !isCancelling,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 32.dp)
+                    .padding(horizontal = 32.dp, vertical = 24.dp)
                     .height(48.dp)
             ) {
                 Text(
@@ -140,14 +167,16 @@ fun QrResultScreen(
                 )
             }
 
+            // Mostrar error de cancelación
             cancelError?.let { error ->
-                Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = error,
                     color = ErrorColor,
                     fontSize = 14.sp,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
                 )
             }
         }
@@ -159,15 +188,13 @@ fun HeaderSection() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(100.dp),
+            .height(80.dp),
         contentAlignment = Alignment.Center
     ) {
         Image(
             painter = painterResource(id = R.drawable.yappy_logo),
             contentDescription = "Logo Yappy",
-            modifier = Modifier
-                .fillMaxWidth(0.5f)
-                .fillMaxHeight(),
+            modifier = Modifier.size(80.dp),
             contentScale = ContentScale.Fit
         )
     }
@@ -177,16 +204,16 @@ fun HeaderSection() {
 fun QrCodeWithBorder(hash: String, size: Int, statusColor: ComposeColor) {
     Card(
         modifier = Modifier
-            .size((size + 40).dp)
+            .size((size + 32).dp)
             .padding(4.dp),
         colors = CardDefaults.cardColors(containerColor = LightBackground),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(20.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp)
+                .padding(12.dp)
                 .background(
                     brush = Brush.radialGradient(
                         colors = listOf(statusColor.copy(alpha = 0.1f), LightBackground)
@@ -243,7 +270,7 @@ fun generateQRCode(text: String, width: Int, height: Int): Bitmap? {
         }
         bmp
     } catch (e: Exception) {
-        e.printStackTrace()
+        Timber.e(e, "Error generating QR bitmap")
         null
     }
 }

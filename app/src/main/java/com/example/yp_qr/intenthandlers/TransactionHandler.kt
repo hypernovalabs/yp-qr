@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.hardware.display.DisplayManager
-import android.util.Log
 import android.widget.Toast
 import androidx.compose.runtime.mutableStateOf
 import com.example.tefbanesco.errors.ErrorHandler
@@ -25,16 +24,15 @@ class TransactionHandler(
     private val onSuccess: (() -> Unit)? = null
 ) {
 
-    private val TAG = "TransactionHandler"
+    // Estado de carga para mostrar LoadingDialog
+    val isLoading = mutableStateOf(false)
     private var retryCount = 0
     private val maxRetries = 3
     private val scope = CoroutineScope(Dispatchers.Main)
 
-    // estado de carga para mostrar LoadingDialog
-    val isLoading = mutableStateOf(false)
-
     fun handle() {
-        Log.i(TAG, "🟢 Iniciando manejo de transacción… (retry=$retryCount)")
+        // 📥 Log de parámetros entrantes
+        Timber.d("🟢 TransactionHandler.handle invoked with action=%s, extras=%s", activity.intent.action, activity.intent.extras)
 
         if (!ApiConfig.isBaseUrlConfigured()) {
             ErrorHandler.showConfigurationError(activity) {
@@ -43,21 +41,24 @@ class TransactionHandler(
             return
         }
 
-        // extrae el monto de la intención original
+        // Extraer y validar monto
         val amountValue = getAmountFromIntent()
         if (amountValue <= 0) {
             showInvalidAmountError()
             return
         }
 
-        // opcional: extraer fecha enviada por la app invocante
+        // Extraer fecha si viene en el Intent
         val dateValue = activity.intent.extras?.getString("date") ?: ""
+
+        // 📥 Log de parámetros procesados
+        Timber.d("📥 Parsed parameters: date=%s, amount=%s", dateValue, amountValue)
 
         scope.launch {
             try {
                 isLoading.value = true
 
-                // abre sesión y guarda token
+                // Abrir sesión y guardar token
                 val config = LocalStorage.getConfig(activity)
                 val token = ApiService.openDeviceSession(
                     apiKey = config["api_key"] ?: "",
@@ -70,8 +71,20 @@ class TransactionHandler(
                 )
                 LocalStorage.saveToken(activity, token)
 
-                // genera QR
+                // 📥 Log del token de sesión
+                Timber.d("⚙️ Session opened, token=%s", token)
+
+                // Construir endpoint de QR
                 val qrEndpoint = "${ApiConfig.BASE_URL}/qr/generate/DYN"
+                // 📥 Log de parámetros para generar QR
+                Timber.d(
+                    "⚙️ Generating QR with endpoint=%s, apiKey=%s, secretKey=%s, inputValue=%s",
+                    qrEndpoint,
+                    config["api_key"],
+                    config["secret_key"],
+                    amountValue
+                )
+
                 val (orderId, responseJson) = ApiService.generateQrWithToken(
                     endpoint = qrEndpoint,
                     token = token,
@@ -80,6 +93,7 @@ class TransactionHandler(
                     inputValue = amountValue
                 )
 
+                // Manejar la respuesta y lanzar la Activity
                 handleQrResponse(orderId, responseJson, dateValue, amountValue)
 
             } catch (e: Exception) {
@@ -101,16 +115,16 @@ class TransactionHandler(
         if (json.has("body")) {
             val body = json.getJSONObject("body")
             val resultHash = body.optString("hash")
-            Log.i(TAG, "✅ QR generado: hash=$resultHash")
+            Timber.d("✅ QR generated: hash=%s", resultHash)
 
             val dm = activity.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
             val displays = dm.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
 
             if (displays.isNotEmpty()) {
-                Log.i(TAG, "🖥️ Mostrando QR en segunda pantalla")
+                Timber.d("🖥️ Displaying QR on secondary screen")
                 QrPresentation(activity, resultHash).show()
             } else {
-                Log.i(TAG, "📱 Mostrando QR en Activity normal")
+                Timber.d("📱 Displaying QR in QrResultActivity")
                 val qrIntent = Intent(activity, QrResultActivity::class.java).apply {
                     putExtra("qrHash", resultHash)
                     putExtra("qrTransactionId", orderId)
@@ -124,14 +138,14 @@ class TransactionHandler(
 
         } else {
             val msg = json.optString("message", "Error desconocido al generar QR")
-            Log.e(TAG, "⚠️ Respuesta sin 'body': $msg")
+            Timber.e("⚠️ Response missing 'body': %s", msg)
             Toast.makeText(activity, msg, Toast.LENGTH_LONG).show()
             finishWithCancel()
         }
     }
 
     private fun handleTransactionError(e: Exception) {
-        Timber.e(e, "💥 Excepción durante la generación del QR")
+        Timber.e(e, "💥 Exception during QR generation")
         val errorMessage = ErrorUtils.getErrorMessageFromException(e)
 
         if (retryCount < maxRetries) {

@@ -29,21 +29,22 @@ object LocalStorage {
             .apply()
     }
 
-    // Obtener configuración guardada
+    // Obtener configuración guardada (incluye ahora el token)
     fun getConfig(context: Context): Map<String, String> {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         return mapOf(
-            "endpoint" to (prefs.getString("endpoint", "") ?: ""),
-            "api_key" to (prefs.getString("api_key", "") ?: ""),
-            "secret_key" to (prefs.getString("secret_key", "") ?: ""),
-            "device.id" to (prefs.getString("device.id", "") ?: ""),
-            "device.name" to (prefs.getString("device.name", "") ?: ""),
-            "device.user" to (prefs.getString("device.user", "") ?: ""),
-            "group_id" to (prefs.getString("group_id", "") ?: "")
+            "endpoint"     to (prefs.getString("endpoint", "")     ?: ""),
+            "api_key"      to (prefs.getString("api_key", "")      ?: ""),
+            "secret_key"   to (prefs.getString("secret_key", "")   ?: ""),
+            "device.id"    to (prefs.getString("device.id", "")    ?: ""),
+            "device.name"  to (prefs.getString("device.name", "")  ?: ""),
+            "device.user"  to (prefs.getString("device.user", "")  ?: ""),
+            "group_id"     to (prefs.getString("group_id", "")     ?: ""),
+            "device_token" to (prefs.getString("device_token", "") ?: "")  // ← Aquí añadimos el token
         )
     }
 
-    // ❗✅ Nueva función para guardar el token
+    // Guardar el token de sesión (Bearer)
     fun saveToken(context: Context, token: String) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit()
@@ -51,7 +52,7 @@ object LocalStorage {
             .apply()
     }
 
-    // Limpiar todo
+    // Limpiar toda la configuración (incluido token)
     fun clear(context: Context) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().clear().apply()

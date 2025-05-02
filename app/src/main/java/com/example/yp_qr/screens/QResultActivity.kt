@@ -12,22 +12,34 @@ class QrResultActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Obtiene datos del intent
+        // Obtener datos del Intent
         val date = intent.getStringExtra("qrDate") ?: ""
         val transactionId = intent.getStringExtra("qrTransactionId") ?: ""
         val hash = intent.getStringExtra("qrHash") ?: ""
         val amount = intent.getStringExtra("qrAmount") ?: ""
+
+        // Log de los parámetros recibidos
+        Timber.d(
+            "🔍 QrResultActivity onCreate: date=%s, transactionId=%s, hash=%s, amount=%s",
+            date, transactionId, hash, amount
+        )
 
         setContent {
             // Estado para mostrar la pantalla de cancelación exitosa
             var showCancelSuccess by remember { mutableStateOf(false) }
 
             if (showCancelSuccess) {
-                // Cuando se cancela con éxito, mostrar CancelSuccessScreen
+                // Mostrar pantalla de éxito al cancelar
                 CancelSuccessScreen(
                     title = "Pago Cancelado",
                     message = "El pago fue cancelado exitosamente.",
-                    onConfirm = { finish() }
+                    onConfirm = {
+                        Timber.d(
+                            "✅ CancelSuccessScreen onConfirm: cerrando QrResultActivity for transactionId=%s",
+                            transactionId
+                        )
+                        finish()
+                    }
                 )
             } else {
                 // Pantalla principal de QR
@@ -37,8 +49,10 @@ class QrResultActivity : ComponentActivity() {
                     hash = hash,
                     amount = amount,
                     onCancelSuccess = {
-                        // Al cancelar, cambia el estado y loguea el evento
-                        Timber.d("🔔 QrResultActivity - onCancelSuccess: Pago cancelado para transactionId=%s", transactionId)
+                        Timber.d(
+                            "🔔 QrResultActivity - onCancelSuccess: Pago cancelado para transactionId=%s",
+                            transactionId
+                        )
                         showCancelSuccess = true
                     }
                 )
