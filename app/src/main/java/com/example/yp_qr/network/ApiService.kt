@@ -25,6 +25,12 @@ object ApiService {
                 requestMethod = method
                 doInput = true
                 doOutput = (body != null)
+
+                // ← Desactivar cache local
+                useCaches = false
+                setRequestProperty("Cache-Control", "no-cache")
+                setRequestProperty("Pragma", "no-cache")
+
                 headers.forEach { (key, value) ->
                     setRequestProperty(key, value)
                 }
@@ -50,8 +56,11 @@ object ApiService {
             Log.d("ApiService", "🔵 Code: $responseCode")
             Log.d("ApiService", "📜 Resp: $responseBody")
 
-            if (responseCode in 200..299) responseBody
-            else throw Exception("HTTP $responseCode: $responseBody")
+            if (responseCode in 200..299) {
+                responseBody
+            } else {
+                throw Exception("HTTP $responseCode: $responseBody")
+            }
         } catch (e: Exception) {
             Log.e("ApiService", "💥 Error in [$method] $urlString", e)
             throw Exception("Excepción en [$method] $urlString: ${e.localizedMessage}")
