@@ -171,11 +171,17 @@ class TransactionHandler(
     }
 
     private fun getAmountFromIntent(): Double {
-        val extras = activity.intent.extras
+        val extras    = activity.intent.extras
         val amountStr = extras?.getString("Amount")
             ?: activity.intent.getStringExtra("Amount")
             ?: "0"
         var amount = amountStr.toDoubleOrNull() ?: 0.0
+
+        // Ajuste: si el monto viene en centavos (>=100), convertir a unidades
+        if (amount >= 100) {
+            Timber.d("↔️ Ajustando amount de $amount centavos a ${amount / 100}")
+            amount /= 100.0
+        }
 
         if (amount <= 0) {
             val documentData = extras?.getString("DocumentData") ?: ""

@@ -30,6 +30,8 @@ import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import java.text.NumberFormat
+import java.util.Locale
 
 // 🎨 Paleta de colores
 val PrimaryColor     = ComposeColor(0xFF1E88E5)
@@ -50,6 +52,12 @@ fun QrResultScreen(
     LaunchedEffect(Unit) {
         Timber.d("▶ Showing QrResultScreen date=%s, txnId=%s, hash=%s, amount=%s",
             date, transactionId, hash, amount)
+    }
+
+    // Formatear monto como moneda USD
+    val formattedAmount = remember(amount) {
+        val value = amount.toDoubleOrNull() ?: 0.0
+        NumberFormat.getCurrencyInstance(Locale.US).format(value)
     }
 
     val scrollState = rememberScrollState()
@@ -81,7 +89,7 @@ fun QrResultScreen(
             Spacer(modifier = Modifier.height(12.dp))
 
             Text(
-                text = "Monto a pagar: $amount",
+                text = "Monto a pagar: $formattedAmount",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 color = ComposeColor.White,
