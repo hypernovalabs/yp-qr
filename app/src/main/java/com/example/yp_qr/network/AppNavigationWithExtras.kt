@@ -17,51 +17,48 @@ fun AppNavigationWithExtras(
     date: String?,
     transactionId: String?,
     hash: String?,
-    amount: String?,               // ← Nuevo parámetro
-    onCancelSuccess: () -> Unit
+    amount: String?,
+    onCancelSuccess: () -> Unit,
+    onPaymentSuccess: () -> Unit    // ← Nuevo parámetro
 ) {
     NavHost(
         navController = navController,
         startDestination = "mainScreen"
     ) {
-        // Pantalla principal
         composable("mainScreen") {
             MainScreen(navController)
         }
-
-        // Destino QR con los cuatro argumentos: date, transactionId, hash y amount
         composable(
             route = "qrResult/{date}/{transactionId}/{hash}/{amount}",
             arguments = listOf(
                 navArgument("date") { type = NavType.StringType },
                 navArgument("transactionId") { type = NavType.StringType },
                 navArgument("hash") { type = NavType.StringType },
-                navArgument("amount") { type = NavType.StringType }    // ← Argumento para el monto
+                navArgument("amount") { type = NavType.StringType }
             )
-        ) { backStackEntry ->
-            val argDate = backStackEntry.arguments?.getString("date") ?: ""
-            val argTransactionId = backStackEntry.arguments?.getString("transactionId") ?: ""
-            val argHash = backStackEntry.arguments?.getString("hash") ?: ""
-            val argAmount = backStackEntry.arguments?.getString("amount") ?: "" // ← Recupera el monto
-
+        ) { backStack ->
+            val argDate = backStack.arguments?.getString("date") ?: ""
+            val argTxn  = backStack.arguments?.getString("transactionId") ?: ""
+            val argHash = backStack.arguments?.getString("hash") ?: ""
+            val argAmt  = backStack.arguments?.getString("amount") ?: ""
             QrResultScreen(
-                date = argDate,
-                transactionId = argTransactionId,
-                hash = argHash,
-                amount = argAmount,                                       // ← Lo pasa al Composable
-                onCancelSuccess = onCancelSuccess
+                date            = argDate,
+                transactionId   = argTxn,
+                hash            = argHash,
+                amount          = argAmt,
+                onCancelSuccess = onCancelSuccess,
+                onPaymentSuccess= onPaymentSuccess     // ← Pasamos el nuevo callback
             )
         }
     }
 
-    // Lanzar la navegación cuando los extras lleguen
     LaunchedEffect(navigateTo, date, transactionId, hash, amount) {
         if (
             navigateTo == "qrResult" &&
             !date.isNullOrBlank() &&
             !transactionId.isNullOrBlank() &&
             !hash.isNullOrBlank() &&
-            !amount.isNullOrBlank()                                  // ← Verifica también el monto
+            !amount.isNullOrBlank()
         ) {
             navController.navigate("qrResult/$date/$transactionId/$hash/$amount")
         }

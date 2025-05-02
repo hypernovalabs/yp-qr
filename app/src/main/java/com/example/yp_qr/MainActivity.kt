@@ -24,40 +24,36 @@ import com.example.tefbanesco.screens.CancelSuccessScreen
 import com.example.tefbanesco.screens.SuccessScreen
 import timber.log.Timber
 import timber.log.Timber.DebugTree
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 
 class MainActivity : ComponentActivity() {
 
     private lateinit var transactionHandler: TransactionHandler
 
-    // Estados para Compose que se actualizan en onNewIntent
     private val intentActionState = mutableStateOf<String?>(null)
-    private val extrasState = mutableStateOf<Bundle?>(null)
+    private val extrasState       = mutableStateOf<Bundle?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Inicializar Timber en cualquier modo para capturar logs siempre
         Timber.plant(DebugTree())
-        Timber.d("🔍 onCreate Intent recibido: action=%s, extras=%s", intent?.action, intent?.extras)
+        Timber.d("🔍 onCreate Intent: action=%s, extras=%s", intent?.action, intent?.extras)
 
-        // Cargar estado inicial de Intent
         intentActionState.value = intent?.action
-        extrasState.value = intent?.extras
+        extrasState.value       = intent?.extras
 
         enableEdgeToEdge()
-        Timber.d("✨ Cargando configuración con ConfigManager.loadConfig")
         ConfigManager.loadConfig(this)
 
         setContent {
-            // Observar cambios de Intent
             val intentAction by intentActionState
-            val extras by extrasState
+            val extras       by extrasState
 
-            var showSuccessScreen by remember { mutableStateOf(false) }
-            var showCancelSuccessScreen by remember { mutableStateOf(false) }
-            var showConfigDialog by remember { mutableStateOf(false) }
-            var showErrorDialog by remember { mutableStateOf(false) }
+            var showSuccessScreen        by remember { mutableStateOf(false) }
+            var showCancelSuccessScreen  by remember { mutableStateOf(false) }
+            var showConfigDialog         by remember { mutableStateOf(false) }
+            var showErrorDialog          by remember { mutableStateOf(false) }
 
             transactionHandler = TransactionHandler(
                 activity = this,
@@ -68,40 +64,44 @@ class MainActivity : ComponentActivity() {
             )
 
             MainContent(
-                intentAction = intentAction,
-                extras = extras,
-                transactionHandler = transactionHandler,
-                showSuccessScreen = showSuccessScreen,
-                showCancelSuccessScreen = showCancelSuccessScreen,
-                showConfigDialog = showConfigDialog,
-                showErrorDialog = showErrorDialog,
-                onSuccessConfirm = {
-                    Timber.d("🆗 Confirmando éxito y finalizando Activity")
+                intentAction           = intentAction,
+                extras                  = extras,
+                transactionHandler     = transactionHandler,
+                showSuccessScreen      = showSuccessScreen,
+                showCancelSuccessScreen= showCancelSuccessScreen,
+                showConfigDialog       = showConfigDialog,
+                showErrorDialog        = showErrorDialog,
+                onSuccessConfirm       = {
+                    Timber.d("🆗 Confirmado éxito, cerrando Activity")
                     showSuccessScreen = false
                     finish()
                 },
-                onCancelConfirm = {
-                    Timber.d("❎ Confirmando cancelación y finalizando Activity")
+                onCancelConfirm        = {
+                    Timber.d("❎ Confirmado cancelación, cerrando Activity")
                     showCancelSuccessScreen = false
                     finish()
                 },
                 onRequestCancelSuccess = {
-                    Timber.d("🔄 Solicitud de pantalla de cancelación exitosa")
+                    Timber.d("🔄 Mostrar CancelSuccessScreen")
                     showCancelSuccessScreen = true
                 },
-                onRequestShowConfig = {
-                    Timber.d("⚙️ Solicitando mostrar diálogo de configuración")
+                onRequestShowConfig    = {
+                    Timber.d("⚙️ Mostrar ConfigDialog")
                     showConfigDialog = true
                     showErrorDialog = false
                 },
-                onDismissConfig = {
-                    Timber.d("✖️ Diálogo de configuración cerrado, finalizando Activity")
+                onDismissConfig        = {
+                    Timber.d("✖️ Cerrar ConfigDialog y Activity")
                     showConfigDialog = false
                     finish()
                 },
-                onRequestShowError = {
-                    Timber.d("🚨 Solicitando mostrar diálogo de error de configuración")
+                onRequestShowError     = {
+                    Timber.d("🚨 Mostrar ErrorDialog")
                     showErrorDialog = true
+                },
+                onPaymentSuccess       = {  // ← Nuevo callback para pago confirmado
+                    Timber.d("🎉 onPaymentSuccess callback: showSuccessScreen = true")
+                    showSuccessScreen = true
                 }
             )
         }
@@ -109,10 +109,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        // Actualizar estado de Intent para que Compose reaccione
         Timber.d("🔄 onNewIntent: action=%s, extras=%s", intent.action, intent.extras)
         intentActionState.value = intent.action
-        extrasState.value = intent.extras
+        extrasState.value       = intent.extras
     }
 }
 
@@ -130,18 +129,16 @@ fun MainContent(
     onRequestCancelSuccess: () -> Unit,
     onRequestShowConfig: () -> Unit,
     onDismissConfig: () -> Unit,
-    onRequestShowError: () -> Unit
+    onRequestShowError: () -> Unit,
+    onPaymentSuccess: () -> Unit          // ← Agregamos aquí el parámetro
 ) {
-    val context = LocalContext.current
+    val context       = LocalContext.current
     val navController = rememberNavController()
 
     LaunchedEffect(intentAction) {
-        Timber.d("🔄 MainContent LaunchedEffect: intentAction=%s", intentAction)
         if (intentAction == "icg.actions.electronicpayment.tefbanesco.TRANSACTION") {
-            Timber.d("🚀 Ejecutando TransactionHandler.handle()")
+            Timber.d("🚀 Lanzando TransactionHandler.handle()")
             transactionHandler.handle()
-        } else {
-            Timber.d("ℹ️ Ignorando intentAction=%s", intentAction)
         }
     }
 
@@ -149,26 +146,27 @@ fun MainContent(
         Box(modifier = Modifier.fillMaxSize()) {
             when {
                 showConfigDialog -> ConfigDialog(onDismiss = onDismissConfig)
-                showErrorDialog -> ErrorHandler.showConfigurationError(context as Activity) { onRequestShowConfig() }
-                transactionHandler.isLoading.value -> LoadingDialog(message = "Procesando transacción..." )
+                showErrorDialog  -> ErrorHandler.showConfigurationError(context as Activity) { onRequestShowConfig() }
+                transactionHandler.isLoading.value -> LoadingDialog("Procesando transacción...")
                 showSuccessScreen -> SuccessScreen(
-                    title = "¡QR Generado!",
+                    title   = "¡QR Generado!",
                     message = "Por favor escanee el QR para completar el pago.",
                     onConfirm = onSuccessConfirm
                 )
                 showCancelSuccessScreen -> CancelSuccessScreen(
-                    title = "Pago Cancelado",
+                    title   = "Pago Cancelado",
                     message = "El pago fue cancelado exitosamente.",
                     onConfirm = onCancelConfirm
                 )
                 else -> AppNavigationWithExtras(
-                    navController = navController,
-                    navigateTo = extras?.getString("navigateTo"),
-                    date = extras?.getString("date"),
-                    transactionId = extras?.getString("transactionId"),
-                    hash = extras?.getString("hash"),
-                    amount = extras?.getString("amount"),       // ← Agregado monto
-                    onCancelSuccess = onRequestCancelSuccess
+                    navController      = navController,
+                    navigateTo         = extras?.getString("navigateTo"),
+                    date               = extras?.getString("date"),
+                    transactionId      = extras?.getString("transactionId"),
+                    hash               = extras?.getString("hash"),
+                    amount             = extras?.getString("amount"),
+                    onCancelSuccess    = onRequestCancelSuccess,
+                    onPaymentSuccess   = onPaymentSuccess   // ← Ya lo pasamos
                 )
             }
         }

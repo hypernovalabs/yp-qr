@@ -28,7 +28,9 @@ import com.example.tefbanesco.storage.LocalStorage
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 import timber.log.Timber
 import java.text.NumberFormat
 import java.util.Locale
@@ -38,7 +40,7 @@ val PrimaryColor     = ComposeColor(0xFF1E88E5)
 val PrimaryDark      = ComposeColor(0xFF1565C0)
 val AccentColor      = ComposeColor(0xFF42A5F5)
 val ErrorColor       = ComposeColor(0xFFFF7043)
-val LightBackground = ComposeColor(0xFFF1F8FF)
+val LightBackground  = ComposeColor(0xFFF1F8FF)
 
 @Composable
 fun QrResultScreen(
@@ -46,9 +48,10 @@ fun QrResultScreen(
     transactionId: String,
     hash: String,
     amount: String,
-    onCancelSuccess: () -> Unit
+    onCancelSuccess: () -> Unit,
+    onPaymentSuccess: () -> Unit  // nuevo callback para pago exitoso
 ) {
-    // Sólo un log inicial
+    // Log inicial
     LaunchedEffect(Unit) {
         Timber.d("▶ Showing QrResultScreen date=%s, txnId=%s, hash=%s, amount=%s",
             date, transactionId, hash, amount)
@@ -60,11 +63,48 @@ fun QrResultScreen(
         NumberFormat.getCurrencyInstance(Locale.US).format(value)
     }
 
-    val scrollState = rememberScrollState()
+    // Obtener credenciales
     val context = LocalContext.current
+    val config = LocalStorage.getConfig(context)
+    val token     = config["device_token"] ?: ""
+    val apiKey    = config["api_key"]      ?: ""
+    val secretKey = config["secret_key"]   ?: ""
+
+    // Estado UI
+    val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
     var isCancelling by remember { mutableStateOf(false) }
     var cancelError by remember { mutableStateOf<String?>(null) }
+
+    // Polling de estado de transacción
+    LaunchedEffect(transactionId) {
+        while (true) {
+            if (isCancelling) {
+                Timber.d("Polling stopped: cancellation requested for txnId=%s", transactionId)
+                break
+            }
+            Timber.d("Polling status for txnId=%s", transactionId)
+            try {
+                val resp = ApiService.getTransactionStatus(
+                    transactionId = transactionId,
+                    token = token,
+                    apiKey = apiKey,
+                    secretKey = secretKey
+                )
+                val body = JSONObject(resp).optJSONObject("body")
+                val status = body?.optString("status") ?: ""
+                Timber.d("Polled status=%s for txnId=%s", status, transactionId)
+                if (status == "COMPLETED") {
+                    Timber.i("Payment completed for txnId=%s", transactionId)
+                    onPaymentSuccess()
+                    break
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Error polling transaction status for txnId=%s", transactionId)
+            }
+            delay(5_000) // espera 5 segundos antes de la siguiente llamada
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -126,11 +166,6 @@ fun QrResultScreen(
                         isCancelling = true
                         cancelError = null
 
-                        val config = LocalStorage.getConfig(context)
-                        val token = config["device_token"] ?: ""
-                        val apiKey = config["api_key"] ?: ""
-                        val secretKey = config["secret_key"] ?: ""
-
                         Timber.d("🔄 Calling cancelTransaction api with txnId=%s, token=%s, apiKey=%s",
                             transactionId, token, apiKey)
 
@@ -142,17 +177,17 @@ fun QrResultScreen(
                                 secretKey = secretKey
                             )
                         } catch (e: Exception) {
-                            Timber.e(e, "❌ cancelTransaction threw")
+                            Timber.e(e, "❌ cancelTransaction exception for txnId=%s", transactionId)
                             isCancelling = false
                             cancelError = "Exception: ${e.localizedMessage}"
                             return@launch
                         }
 
-                        Timber.d("📥 cancelTransaction result=%s", result)
+                        Timber.d("📥 cancelTransaction result=%s for txnId=%s", result, transactionId)
                         isCancelling = false
 
                         if (result.contains("Error") || result.contains("Excepción")) {
-                            Timber.w("⚠️ cancelTransaction returned error payload")
+                            Timber.w("⚠️ cancelTransaction returned error payload for txnId=%s", transactionId)
                             cancelError = "Error al cancelar el pago: $result"
                         } else {
                             Timber.i("🎉 cancelTransaction successful for txnId=%s", transactionId)
