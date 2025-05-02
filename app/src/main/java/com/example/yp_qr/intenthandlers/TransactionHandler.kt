@@ -18,10 +18,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.json.JSONObject
+import timber.log.Timber
 
 class TransactionHandler(
     private val activity: Activity,
-    private val onSuccess: (() -> Unit)? = null // 🔵 Callback para éxito
+    private val onSuccess: (() -> Unit)? = null
 ) {
 
     private val TAG = "TransactionHandler"
@@ -29,6 +30,7 @@ class TransactionHandler(
     private val maxRetries = 3
     private val scope = CoroutineScope(Dispatchers.Main)
 
+    // estado de carga para mostrar LoadingDialog
     val isLoading = mutableStateOf(false)
 
     fun handle() {
@@ -41,16 +43,21 @@ class TransactionHandler(
             return
         }
 
-        val amount = getAmountFromIntent()
-        if (amount <= 0) {
+        // extrae el monto de la intención original
+        val amountValue = getAmountFromIntent()
+        if (amountValue <= 0) {
             showInvalidAmountError()
             return
         }
+
+        // opcional: extraer fecha enviada por la app invocante
+        val dateValue = activity.intent.extras?.getString("date") ?: ""
 
         scope.launch {
             try {
                 isLoading.value = true
 
+                // abre sesión y guarda token
                 val config = LocalStorage.getConfig(activity)
                 val token = ApiService.openDeviceSession(
                     apiKey = config["api_key"] ?: "",
@@ -63,16 +70,17 @@ class TransactionHandler(
                 )
                 LocalStorage.saveToken(activity, token)
 
+                // genera QR
                 val qrEndpoint = "${ApiConfig.BASE_URL}/qr/generate/DYN"
                 val (orderId, responseJson) = ApiService.generateQrWithToken(
                     endpoint = qrEndpoint,
                     token = token,
                     apiKey = config["api_key"] ?: "",
                     secretKey = config["secret_key"] ?: "",
-                    inputValue = amount
+                    inputValue = amountValue
                 )
 
-                handleQrResponse(responseJson)
+                handleQrResponse(orderId, responseJson, dateValue, amountValue)
 
             } catch (e: Exception) {
                 handleTransactionError(e)
@@ -82,7 +90,12 @@ class TransactionHandler(
         }
     }
 
-    private fun handleQrResponse(responseJson: String) {
+    private fun handleQrResponse(
+        orderId: String,
+        responseJson: String,
+        dateValue: String,
+        amountValue: Double
+    ) {
         val json = JSONObject(responseJson)
 
         if (json.has("body")) {
@@ -90,23 +103,23 @@ class TransactionHandler(
             val resultHash = body.optString("hash")
             Log.i(TAG, "✅ QR generado: hash=$resultHash")
 
-            // 🔵 Mostrar en pantalla secundaria si existe
             val dm = activity.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
             val displays = dm.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
 
             if (displays.isNotEmpty()) {
                 Log.i(TAG, "🖥️ Mostrando QR en segunda pantalla")
-                val presentation = QrPresentation(activity, resultHash)
-                presentation.show()
+                QrPresentation(activity, resultHash).show()
             } else {
                 Log.i(TAG, "📱 Mostrando QR en Activity normal")
                 val qrIntent = Intent(activity, QrResultActivity::class.java).apply {
                     putExtra("qrHash", resultHash)
+                    putExtra("qrTransactionId", orderId)
+                    putExtra("qrDate", dateValue)
+                    putExtra("qrAmount", amountValue.toString())
                 }
                 activity.startActivity(qrIntent)
             }
 
-            // 🔵 Llamar al callback de éxito
             onSuccess?.invoke()
 
         } else {
@@ -118,7 +131,7 @@ class TransactionHandler(
     }
 
     private fun handleTransactionError(e: Exception) {
-        Log.e(TAG, "💥 Excepción durante la generación del QR", e)
+        Timber.e(e, "💥 Excepción durante la generación del QR")
         val errorMessage = ErrorUtils.getErrorMessageFromException(e)
 
         if (retryCount < maxRetries) {
@@ -145,17 +158,17 @@ class TransactionHandler(
 
     private fun getAmountFromIntent(): Double {
         val extras = activity.intent.extras
-        val amountStr = extras?.getString("Amount") ?: activity.intent.getStringExtra("Amount") ?: "0"
+        val amountStr = extras?.getString("Amount")
+            ?: activity.intent.getStringExtra("Amount")
+            ?: "0"
         var amount = amountStr.toDoubleOrNull() ?: 0.0
 
         if (amount <= 0) {
             val documentData = extras?.getString("DocumentData") ?: ""
-            val netAmountRegex = Regex("""<HeaderField Key="NetAmount">([\d.]+)</HeaderField>""")
+            val netAmountRegex = Regex("""<HeaderField Key=\"NetAmount\">([\d.]+)</HeaderField>""")
             val match = netAmountRegex.find(documentData)
             val netAmount = match?.groups?.get(1)?.value?.toDoubleOrNull()
-            if (netAmount != null && netAmount > 0) {
-                amount = netAmount
-            }
+            if (netAmount != null && netAmount > 0) amount = netAmount
         }
 
         return amount

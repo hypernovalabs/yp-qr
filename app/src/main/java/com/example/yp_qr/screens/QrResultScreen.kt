@@ -40,7 +40,8 @@ fun QrResultScreen(
     date: String,
     transactionId: String,
     hash: String,
-    onCancelSuccess: () -> Unit // 🔵 Callback para cuando se cancele exitosamente
+    amount: String,                      // Nuevo parámetro para el monto
+    onCancelSuccess: () -> Unit         // 🔵 Callback para cuando se cancele exitosamente
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -62,9 +63,23 @@ fun QrResultScreen(
         ) {
             HeaderSection()
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            QrCodeWithBorder(hash = hash, size = 340, statusColor = PrimaryColor)
+            // Mostrar el monto de pago
+            Text(
+                text = "Monto a pagar: $amount",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = ComposeColor.White,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            QrCodeWithBorder(hash = hash, size = 300, statusColor = PrimaryColor)
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -79,7 +94,7 @@ fun QrResultScreen(
                     .padding(horizontal = 32.dp)
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
             Button(
                 onClick = {
@@ -108,11 +123,21 @@ fun QrResultScreen(
                         }
                     }
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = ErrorColor),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = ComposeColor.White  // fondo blanco para mejor contraste
+                ),
                 enabled = !isCancelling,
-                modifier = Modifier.fillMaxWidth(0.8f)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp)
+                    .height(48.dp)
             ) {
-                Text(if (isCancelling) "Cancelando..." else "Cancelar Pago")
+                Text(
+                    text = if (isCancelling) "Cancelando..." else "Cancelar Pago",
+                    color = ErrorColor,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium
+                )
             }
 
             cancelError?.let { error ->
