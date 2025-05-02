@@ -1,4 +1,4 @@
-package com.example.yp_qr.dialogs
+package com.example.tefbanesco.dialogs
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape

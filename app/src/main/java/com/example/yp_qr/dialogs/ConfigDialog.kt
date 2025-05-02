@@ -1,4 +1,4 @@
-package com.example.yp_qr.dialogs
+package com.example.tefbanesco.dialogs
 
 import android.content.Context
 import androidx.compose.foundation.layout.*
@@ -13,8 +13,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import com.example.yp_qr.network.ConfigManager
-import com.example.yp_qr.network.ConfigNetworkHelper
+import com.example.tefbanesco.network.ConfigManager
+import com.example.tefbanesco.network.ConfigNetworkHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 

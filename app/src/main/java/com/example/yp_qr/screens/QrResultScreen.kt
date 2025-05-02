@@ -1,4 +1,4 @@
-package com.example.yp_qr.screens
+package com.example.tefbanesco.screens
 
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -20,9 +20,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.yp_qr.R
-import com.example.yp_qr.network.ApiService
-import com.example.yp_qr.storage.LocalStorage
+import com.example.tefbanesco.R
+import com.example.tefbanesco.network.ApiService
+import com.example.tefbanesco.storage.LocalStorage
 import kotlinx.coroutines.launch
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter

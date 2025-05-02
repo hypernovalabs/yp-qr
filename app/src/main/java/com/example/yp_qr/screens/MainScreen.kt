@@ -1,4 +1,4 @@
-package com.example.yp_qr.screens
+package com.example.tefbanesco.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -14,10 +14,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.example.yp_qr.components.SquareButton
-import com.example.yp_qr.dialogs.ConfigDialog
-import com.example.yp_qr.dialogs.TestInputDialog
-import com.example.yp_qr.network.NetworkUtils
+import com.example.tefbanesco.components.SquareButton
+import com.example.tefbanesco.dialogs.ConfigDialog
+import com.example.tefbanesco.dialogs.TestInputDialog
+import com.example.tefbanesco.network.NetworkUtils
 import kotlinx.coroutines.launch
 
 @Composable

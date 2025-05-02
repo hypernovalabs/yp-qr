@@ -1,4 +1,4 @@
-# 📦 CHANGELOG - YP_QR Payment Integration Module
+# 📦 CHANGELOG - tefbanesco Payment Integration Module
 
 Registro de cambios del módulo de integración de pagos QR.
 

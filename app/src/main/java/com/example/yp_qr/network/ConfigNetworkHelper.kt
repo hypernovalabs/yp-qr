@@ -1,9 +1,9 @@
-package com.example.yp_qr.network
+package com.example.tefbanesco.network
 
 import android.content.Context
 import android.util.Log
-import com.example.yp_qr.storage.CryptoHelper
-import com.example.yp_qr.storage.LocalStorage
+import com.example.tefbanesco.storage.CryptoHelper
+import com.example.tefbanesco.storage.LocalStorage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -58,28 +58,7 @@ object ConfigNetworkHelper {
                         val decryptedJson = JSONObject(decryptedJsonString)
 
                         // Extraer y guardar configuración
-                        val body = decryptedJson.getJSONObject("body")
-                        val config = decryptedJson.getJSONObject("config")
-
-                        val deviceId = body.getJSONObject("device").getString("id")
-                        val deviceName = body.getJSONObject("device").getString("name")
-                        val deviceUser = body.getJSONObject("device").getString("user")
-                        val groupId = body.getString("group_id")
-
-                        val endpoint = config.getString("endpoint")
-                        val apiKey = config.getString("api-key")
-                        val secretKey = config.getString("secret-key")
-
-                        LocalStorage.saveConfig(
-                            context = context,
-                            endpoint = endpoint,
-                            apiKey = apiKey,
-                            secretKey = secretKey,
-                            deviceId = deviceId,
-                            deviceName = deviceName,
-                            deviceUser = deviceUser,
-                            groupId = groupId
-                        )
+                        saveDecryptedConfig(context, decryptedJson)
 
                         true
                     }
@@ -89,13 +68,64 @@ object ConfigNetworkHelper {
                     }
                     else -> {
                         Log.e(TAG, "❌ Error inesperado del servidor: Código HTTP ${conn.responseCode}")
+                        saveDefaultConfig(context) // 👈 Aquí guardamos config de respaldo
                         false
                     }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Excepción durante login: ${e.message}", e)
+                saveDefaultConfig(context) // 👈 También si hay error de conexión
                 false
             }
         }
+    }
+
+    private fun saveDecryptedConfig(context: Context, decryptedJson: JSONObject) {
+        val body = decryptedJson.getJSONObject("body")
+        val config = decryptedJson.getJSONObject("config")
+
+        val deviceId = body.getJSONObject("device").getString("id")
+        val deviceName = body.getJSONObject("device").getString("name")
+        val deviceUser = body.getJSONObject("device").getString("user")
+        val groupId = body.getString("group_id")
+
+        val endpoint = config.getString("endpoint")
+        val apiKey = config.getString("api-key")
+        val secretKey = config.getString("secret-key")
+
+        LocalStorage.saveConfig(
+            context = context,
+            endpoint = endpoint,
+            apiKey = apiKey,
+            secretKey = secretKey,
+            deviceId = deviceId,
+            deviceName = deviceName,
+            deviceUser = deviceUser,
+            groupId = groupId
+        )
+    }
+
+    private fun saveDefaultConfig(context: Context) {
+        Log.w(TAG, "⚠️ Guardando configuración de respaldo (default)...")
+
+        val deviceId = "CAJA-02"
+        val deviceName = "C"
+        val deviceUser = "a"
+        val groupId = "ID-TESTING-HYPER"
+
+        val endpoint = "https://api-integrationcheckout-uat.yappycloud.com/v1"
+        val apiKey = "937bfbe7-a29e-4fcb-b155-affe133bd3a6"
+        val secretKey = "WVBfQkVCOTZDNzQtMDgxOC0zODVBLTg0ODktNUQxQTNBODVCRjFF"
+
+        LocalStorage.saveConfig(
+            context = context,
+            endpoint = endpoint,
+            apiKey = apiKey,
+            secretKey = secretKey,
+            deviceId = deviceId,
+            deviceName = deviceName,
+            deviceUser = deviceUser,
+            groupId = groupId
+        )
     }
 }

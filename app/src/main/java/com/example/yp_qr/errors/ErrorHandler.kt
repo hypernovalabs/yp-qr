@@ -1,9 +1,9 @@
-package com.example.yp_qr.errors
+package com.example.tefbanesco.errors
 
 import android.app.Activity
 import android.content.Context
 import androidx.appcompat.view.ContextThemeWrapper
-import com.example.yp_qr.R
+import com.example.tefbanesco.R
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 object ErrorHandler {

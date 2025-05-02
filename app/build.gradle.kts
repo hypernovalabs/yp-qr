@@ -5,12 +5,12 @@ plugins {
 }
 
 android {
-    namespace = "com.example.yp_qr"
+    namespace = "com.example.tefbanesco"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.yp_qr"
-        minSdk = 30
+        applicationId = "com.example.tefbanesco"
+        minSdk = 26
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"

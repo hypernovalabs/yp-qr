@@ -1,4 +1,4 @@
-package com.example.yp_qr.utils
+package com.example.tefbanesco.utils
 
 /**
  * Clase para representar la información de un código de estado de tefbanesco.

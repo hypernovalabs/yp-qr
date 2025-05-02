@@ -25,32 +25,62 @@
             android:label="@string/app_name"
             android:theme="@style/AppTheme">
 
-            <!-- Intents de integración HioPosCloud -->
+            <!-- 🎯 Intents habilitados para integración con HioPosCloud -->
+
+            <!-- 🔄 Inicializar configuración -->
             <intent-filter>
                 <action android:name="icg.actions.electronicpayment.none.INITIALIZE" />
-                <action android:name="icg.actions.electronicpayment.tefbanesco.FINALIZE" />
-                <action android:name="icg.actions.electronicpayment.tefbanesco.GET_VERSION" />
-                <action android:name="icg.actions.electronicpayment.tefbanesco.SHOW_SETUP_SCREEN" />
-                <action android:name="icg.actions.electronicpayment.tefbanesco.GET_BEHAVIOR" />
-                <action android:name="icg.actions.electronicpayment.tefbanesco.GET_CUSTOM_PARAMS" />
-                <action android:name="icg.actions.electronicpayment.tefbanesco.TRANSACTION" />
-<!--                <category android:name="android.intent.category.DEFAULT" />-->
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
 
-            <!-- Lanzador manual (Launcher) -->
+            <!-- 🧩 Mostrar pantalla de configuración -->
+            <intent-filter>
+                <action android:name="icg.actions.electronicpayment.tefbanesco.SHOW_SETUP_SCREEN" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- 🔚 Finalizar sesión -->
+            <intent-filter>
+                <action android:name="icg.actions.electronicpayment.tefbanesco.FINALIZE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- 🔢 Obtener versión -->
+            <intent-filter>
+                <action android:name="icg.actions.electronicpayment.tefbanesco.GET_VERSION" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- ⚙️ Obtener comportamiento -->
+            <intent-filter>
+                <action android:name="icg.actions.electronicpayment.tefbanesco.GET_BEHAVIOR" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- 🛠️ Obtener parámetros personalizados -->
+<!--            <intent-filter>-->
+<!--                <action android:name="icg.actions.electronicpayment.tefbanesco.GET_CUSTOM_PARAMS" />-->
+<!--                <category android:name="android.intent.category.DEFAULT" />-->
+<!--            </intent-filter>-->
+
+            <!-- 💳 Transacción (activo principal) -->
+            <intent-filter>
+                <action android:name="icg.actions.electronicpayment.tefbanesco.TRANSACTION" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- 🚀 Lanzador manual -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- ✅ Actividad de Resultado QR -->
+        <!-- ✅ Actividad para mostrar QR -->
         <activity
             android:name=".screens.QrResultActivity"
             android:exported="false"
             android:theme="@style/Theme.Ypqr"
             android:label="QR Result" />
-
     </application>
-
 </manifest>

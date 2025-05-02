@@ -1,4 +1,4 @@
-package com.example.yp_qr
+package com.example.tefbanesco
 
 import org.junit.Test
 

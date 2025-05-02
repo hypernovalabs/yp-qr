@@ -1,4 +1,4 @@
-package com.example.yp_qr
+package com.example.tefbanesco
 
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -19,6 +19,6 @@ class ExampleInstrumentedTest {
     fun useAppContext() {
         // Context of the app under test.
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-        assertEquals("com.example.yp_qr", appContext.packageName)
+        assertEquals("com.example.tefbanesco", appContext.packageName)
     }
 }

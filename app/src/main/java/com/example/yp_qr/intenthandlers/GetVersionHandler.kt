@@ -1,4 +1,4 @@
-package com.example.yp_qr.intenthandlers
+package com.example.tefbanesco.intenthandlers
 
 import android.app.Activity
 import android.content.Intent

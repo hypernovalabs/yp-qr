@@ -1,5 +1,5 @@
 // ✅ NetworkUtils.kt
-package com.example.yp_qr.network
+package com.example.tefbanesco.network
 
 import android.content.Context
 import android.net.ConnectivityManager

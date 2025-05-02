@@ -1,4 +1,4 @@
-package com.example.yp_qr.screens
+package com.example.tefbanesco.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*

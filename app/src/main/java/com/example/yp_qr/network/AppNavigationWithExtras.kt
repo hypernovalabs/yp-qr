@@ -1,4 +1,4 @@
-package com.example.yp_qr.network
+package com.example.tefbanesco.network
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -7,8 +7,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.NavHostController
 import androidx.navigation.navArgument
-import com.example.yp_qr.screens.MainScreen
-import com.example.yp_qr.screens.QrResultScreen
+import com.example.tefbanesco.screens.MainScreen
+import com.example.tefbanesco.screens.QrResultScreen
 
 @Composable
 fun AppNavigationWithExtras(

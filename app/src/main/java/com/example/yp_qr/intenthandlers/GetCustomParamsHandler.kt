@@ -1,4 +1,4 @@
-package com.example.yp_qr.intenthandlers
+package com.example.tefbanesco.intenthandlers
 
 import android.app.Activity
 import android.content.Intent
@@ -11,10 +11,10 @@ class GetCustomParamsHandler(private val activity: Activity) {
 
     fun handle() {
         val result = Intent("icg.actions.electronicpayment.tefbanesco.GET_CUSTOM_PARAMS").apply {
-            putExtra("Name", "Pago tefbanesco QR")
+            putExtra("Name", "YAPPY-QR")
 
             // Cargar logo desde recursos (res/drawable) y convertirlo a Base64
-            val logoBytes = getLogoBase64("tefbanesco_logo.png") // sin extensión
+            val logoBytes = getLogoBase64("yappy_logo.png") // sin extensión
             if (logoBytes != null) {
                 putExtra("Logo", logoBytes)
             }

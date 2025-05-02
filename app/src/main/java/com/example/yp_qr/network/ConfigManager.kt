@@ -1,7 +1,7 @@
-package com.example.yp_qr.network
+package com.example.tefbanesco.network
 
 import android.content.Context
-import com.example.yp_qr.storage.LocalStorage
+import com.example.tefbanesco.storage.LocalStorage
 
 object ConfigManager {
 

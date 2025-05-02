@@ -1,4 +1,4 @@
-package com.example.yp_qr.screens
+package com.example.tefbanesco.screens
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity

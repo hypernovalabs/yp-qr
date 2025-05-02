@@ -1,4 +1,4 @@
-package com.example.yp_qr.intenthandlers
+package com.example.tefbanesco.intenthandlers
 
 import android.app.Activity
 import android.content.Context
@@ -7,13 +7,13 @@ import android.hardware.display.DisplayManager
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.runtime.mutableStateOf
-import com.example.yp_qr.errors.ErrorHandler
-import com.example.yp_qr.network.ApiConfig
-import com.example.yp_qr.network.ApiService
-import com.example.yp_qr.presentation.QrPresentation
-import com.example.yp_qr.screens.QrResultActivity
-import com.example.yp_qr.storage.LocalStorage
-import com.example.yp_qr.utils.ErrorUtils
+import com.example.tefbanesco.errors.ErrorHandler
+import com.example.tefbanesco.network.ApiConfig
+import com.example.tefbanesco.network.ApiService
+import com.example.tefbanesco.presentation.QrPresentation
+import com.example.tefbanesco.screens.QrResultActivity
+import com.example.tefbanesco.storage.LocalStorage
+import com.example.tefbanesco.utils.ErrorUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

@@ -1,4 +1,4 @@
-# 📦 YP_QR Payment Integration Module
+# 📦 tefbanesco Payment Integration Module
 
 Este módulo proporciona una solución completa para la **generación de códigos QR de pago** y la integración con plataformas como **Yappy** u otros servicios de pago en dispositivos Android.
 
@@ -21,7 +21,7 @@ Diseñado para integrarse fácilmente en sistemas POS, kioscos o aplicaciones m�
 
 ## 📦 Estructura del Módulo
 
-com.example.yp_qr/ ├── errors/ # Manejo de errores globales ├── intenthandlers/ # Handlers de intents de transacción ├── network/ # Configuración de APIs y red ├── storage/ # Manejo de almacenamiento local y seguridad ├── ui/ │ ├── navigation/ # Navegación de pantallas │ ├── dialogs/ # Diálogos de configuración y resumen │ ├── screens/ # Pantallas principales │ ├── components/ # Componentes de UI reutilizables │ └── theme/ # Estilos de UI ├── presentation/ # Pantallas secundarias (presentations) ├── utils/ # Utilidades generales └── MainActivity.kt # Entrada principal de la app
+com.example.tefbanesco/ ├── errors/ # Manejo de errores globales ├── intenthandlers/ # Handlers de intents de transacción ├── network/ # Configuración de APIs y red ├── storage/ # Manejo de almacenamiento local y seguridad ├── ui/ │ ├── navigation/ # Navegación de pantallas │ ├── dialogs/ # Diálogos de configuración y resumen │ ├── screens/ # Pantallas principales │ ├── components/ # Componentes de UI reutilizables │ └── theme/ # Estilos de UI ├── presentation/ # Pantallas secundarias (presentations) ├── utils/ # Utilidades generales └── MainActivity.kt # Entrada principal de la app
 
 yaml
 Copy

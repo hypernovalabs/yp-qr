@@ -1,4 +1,4 @@
-package com.example.yp_qr.presentation
+package com.example.tefbanesco.presentation
 
 import android.app.Presentation
 import android.content.Context

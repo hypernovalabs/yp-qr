@@ -1,4 +1,4 @@
-package com.example.yp_qr.utils
+package com.example.tefbanesco.utils
 
 import java.io.IOException
 import java.net.SocketTimeoutException
