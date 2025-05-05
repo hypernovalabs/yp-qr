@@ -4,10 +4,10 @@
     <selectionStates>
       <SelectionState runConfigName="yp-qr">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2025-05-05T20:14:12.167310Z">
+        <DropdownSelection timestamp="2025-05-05T20:26:05.087330Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="LocalEmulator" identifier="path=/Users/raulfernandez/.android/avd/Pixel_7_API_30.avd" />
+              <DeviceId pluginId="LocalEmulator" identifier="path=/Users/raulfernandez/.android/avd/Pixel_Tablet_API_30.avd" />
             </handle>
           </Target>
         </DropdownSelection>
