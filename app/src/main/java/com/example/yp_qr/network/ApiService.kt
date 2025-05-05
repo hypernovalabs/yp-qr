@@ -6,7 +6,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.BufferedReader
-import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -25,8 +24,6 @@ object ApiService {
                 requestMethod = method
                 doInput = true
                 doOutput = (body != null)
-
-                // ← Desactivar cache local
                 useCaches = false
                 setRequestProperty("Cache-Control", "no-cache")
                 setRequestProperty("Pragma", "no-cache")
@@ -118,8 +115,8 @@ object ApiService {
     ): Pair<String, String> {
         val orderId = "ORD-${System.currentTimeMillis()}"
         val subTotal = inputValue
-        val tax = (subTotal * 0.07 * 100).toInt() / 100.0
-        val total = subTotal + tax
+        val tax = 0.0
+        val total = inputValue
 
         val body = JSONObject().apply {
             put("body", JSONObject().apply {
@@ -186,9 +183,6 @@ object ApiService {
         )
     }
 
-    /**
-     * Cierra la sesión de dispositivo (DELETE /session/device)
-     */
     suspend fun closeDeviceSession(
         token: String,
         apiKey: String,

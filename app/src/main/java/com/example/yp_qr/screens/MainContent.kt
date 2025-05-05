@@ -14,8 +14,8 @@ import com.example.tefbanesco.dialogs.LoadingDialog
 import com.example.tefbanesco.errors.ErrorHandler
 import com.example.tefbanesco.intenthandlers.TransactionHandler
 import com.example.tefbanesco.network.AppNavigationWithExtras
-import com.example.tefbanesco.screens.CancelSuccessScreen
-import com.example.tefbanesco.screens.SuccessScreen
+import com.example.tefbanesco.screens.CancelResultScreen
+import com.example.tefbanesco.screens.SuccessResultScreen
 import timber.log.Timber
 
 @Composable
@@ -51,12 +51,12 @@ fun MainContent(
                 showConfigDialog -> ConfigDialog(onDismiss = onDismissConfig)
                 showErrorDialog -> ErrorHandler.showConfigurationError(context as Activity) { onRequestShowConfig() }
                 transactionHandler.isLoading.value -> LoadingDialog("Procesando transacción...")
-                showSuccessScreen -> SuccessScreen(
+                showSuccessScreen -> SuccessResultScreen(
                     title = "¡QR Generado!",
                     message = "Por favor escanee el QR para completar el pago.",
                     onConfirm = onSuccessConfirm
                 )
-                showCancelSuccessScreen -> CancelSuccessScreen(
+                showCancelSuccessScreen -> CancelResultScreen(
                     title = "Pago Cancelado",
                     message = "El pago fue cancelado exitosamente.",
                     onConfirm = onCancelConfirm
@@ -69,7 +69,8 @@ fun MainContent(
                     hash = extras?.getString("hash"),
                     amount = extras?.getString("amount"),
                     onCancelSuccess = onRequestCancelSuccess,
-                    onPaymentSuccess = onPaymentSuccess
+                    onPaymentSuccess = onPaymentSuccess,
+                    transactionHandler = transactionHandler // ✅ se pasa el handler para usar .isLoading
                 )
             }
         }

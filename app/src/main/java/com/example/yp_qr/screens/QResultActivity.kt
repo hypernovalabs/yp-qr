@@ -32,14 +32,14 @@ class QrResultActivity : ComponentActivity() {
 
             when {
                 // 1) Pantalla de cancelación
-                showCancelSuccess -> CancelSuccessScreen(
+                showCancelSuccess -> CancelResultScreen(
                     title = "Pago Cancelado",
                     message = "El pago fue cancelado exitosamente.",
                     onConfirm = { finish() }
                 )
 
                 // 2) Pantalla de éxito
-                showPaymentSuccess -> SuccessScreen(
+                showPaymentSuccess -> SuccessResultScreen(
                     title = "Pago Confirmado",
                     message = "El pago se completó exitosamente.",
                     onConfirm = {

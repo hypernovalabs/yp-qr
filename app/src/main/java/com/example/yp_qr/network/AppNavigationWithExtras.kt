@@ -9,6 +9,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.navArgument
 import com.example.tefbanesco.screens.MainScreen
 import com.example.tefbanesco.screens.QrResultScreen
+import com.example.tefbanesco.intenthandlers.TransactionHandler
 
 @Composable
 fun AppNavigationWithExtras(
@@ -19,14 +20,18 @@ fun AppNavigationWithExtras(
     hash: String?,
     amount: String?,
     onCancelSuccess: () -> Unit,
-    onPaymentSuccess: () -> Unit    // ← Nuevo parámetro
+    onPaymentSuccess: () -> Unit,
+    transactionHandler: TransactionHandler // ← agregado para acceder a isLoading
 ) {
     NavHost(
         navController = navController,
         startDestination = "mainScreen"
     ) {
         composable("mainScreen") {
-            MainScreen(navController)
+            MainScreen(
+                navController = navController,
+                isLoading = transactionHandler.isLoading.value // ← se pasa el estado de carga
+            )
         }
         composable(
             route = "qrResult/{date}/{transactionId}/{hash}/{amount}",
@@ -47,7 +52,7 @@ fun AppNavigationWithExtras(
                 hash            = argHash,
                 amount          = argAmt,
                 onCancelSuccess = onCancelSuccess,
-                onPaymentSuccess= onPaymentSuccess     // ← Pasamos el nuevo callback
+                onPaymentSuccess= onPaymentSuccess
             )
         }
     }

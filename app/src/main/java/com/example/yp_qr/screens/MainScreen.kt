@@ -16,23 +16,26 @@ import androidx.navigation.NavController
 import com.example.tefbanesco.components.SquareButton
 import com.example.tefbanesco.dialogs.ConfigDialog
 import com.example.tefbanesco.network.NetworkUtils
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
-fun MainScreen(navController: NavController) {
+fun MainScreen(
+    navController: NavController,
+    isLoading: Boolean // ← nuevo parámetro para ocultar botón si está cargando
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
     var showConfigDialog by remember { mutableStateOf(false) }
-
     val isOnline = remember { mutableStateOf(NetworkUtils.isConnected(context)) }
 
-    // Efecto para actualizar estado de red periódicamente (opcional)
+    // Efecto para actualizar estado de red periódicamente
     LaunchedEffect(Unit) {
         while (true) {
             isOnline.value = NetworkUtils.isConnected(context)
-            kotlinx.coroutines.delay(3000)
+            delay(3000)
         }
     }
 
@@ -59,16 +62,18 @@ fun MainScreen(navController: NavController) {
                 )
             }
 
-            // Botón central de configuración
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                SquareButton(
-                    text = "Configuración",
-                    icon = Icons.Default.Build,
-                    onClick = { showConfigDialog = true }
-                )
+            // Botón central de configuración (solo si no está cargando)
+            if (!isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    SquareButton(
+                        text = "Configuración",
+                        icon = Icons.Default.Build,
+                        onClick = { showConfigDialog = true }
+                    )
+                }
             }
 
             // Mostrar diálogo de configuración

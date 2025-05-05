@@ -23,8 +23,6 @@ class TransactionHandler(
     private val activity: Activity,
     private val onSuccess: (() -> Unit)? = null
 ) {
-
-    // Estado de carga para mostrar LoadingDialog
     val isLoading = mutableStateOf(false)
     private var retryCount = 0
     private val maxRetries = 3
@@ -62,12 +60,9 @@ class TransactionHandler(
         }
     }
 
-    /**
-     * Inicia una sesión de dispositivo y retorna el token.
-     */
     private suspend fun openSession(context: Context): String {
         val config = LocalStorage.getConfig(context)
-        val token = ApiService.openDeviceSession(
+        return ApiService.openDeviceSession(
             apiKey = config["api_key"] ?: "",
             secretKey = config["secret_key"] ?: "",
             deviceId = config["device.id"] ?: "",
@@ -75,21 +70,16 @@ class TransactionHandler(
             deviceUser = config["device.user"] ?: "",
             groupId = config["group_id"] ?: "",
             context = context
-        )
-        Timber.d("⚙️ Session opened, token=%s", token)
-        return token
+        ).also {
+            Timber.d("⚙️ Session opened, token=%s", it)
+        }
     }
 
-    /**
-     * Genera el QR con el token de sesión.
-     */
     private suspend fun generateQr(token: String, amountValue: Double): Pair<String, String> {
         val config = LocalStorage.getConfig(activity)
         val qrEndpoint = "${ApiConfig.BASE_URL}/qr/generate/DYN"
-        Timber.d(
-            "⚙️ Generating QR with endpoint=%s, apiKey=%s, secretKey=%s, inputValue=%s",
-            qrEndpoint, config["api_key"], config["secret_key"], amountValue
-        )
+        Timber.d("⚙️ Generating QR with endpoint=%s, apiKey=%s, secretKey=%s, inputValue=%s",
+            qrEndpoint, config["api_key"], config["secret_key"], amountValue)
         return ApiService.generateQrWithToken(
             endpoint = qrEndpoint,
             token = token,
@@ -117,6 +107,7 @@ class TransactionHandler(
             if (displays.isNotEmpty()) {
                 Timber.d("🖥️ Displaying QR on secondary screen")
                 QrPresentation(activity, resultHash).show()
+                activity.finish() // <-- ✅ Cierra MainActivity para evitar superposición
             } else {
                 Timber.d("📱 Displaying QR in QrResultActivity")
                 val qrIntent = Intent(activity, QrResultActivity::class.java).apply {
@@ -126,8 +117,12 @@ class TransactionHandler(
                     putExtra("qrAmount", amountValue.toString())
                 }
                 activity.startActivity(qrIntent)
+                activity.finish() // <-- ✅ Cierra MainActivity después de mostrar QR
             }
-            onSuccess?.invoke()
+
+            // ⛔ Ya no mostramos SuccessScreen desde MainActivity
+            // onSuccess?.invoke() ← REMOVIDO
+
         } else {
             val msg = json.optString("message", "Error desconocido al generar QR")
             Timber.e("⚠️ Response missing 'body': %s", msg)

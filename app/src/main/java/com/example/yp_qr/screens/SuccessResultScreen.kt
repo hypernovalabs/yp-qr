@@ -1,30 +1,35 @@
-
-
-// File: CancelSuccessScreen.kt
 package com.example.tefbanesco.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.font.FontWeight
+
+// Paleta de colores
+val WhiteBg   = Color(0xFFF5F9F7)
+val BlueLight = Color(0xFF22B7F5)
+val BlueMid   = Color(0xFF1274BD)
+val BlueDark  = Color(0xFF1A4665)
+val Orange    = Color(0xFFFC943D)
+val GrayDark  = Color(0xFF424242)
 
 @Composable
-fun CancelSuccessScreen(
-    title: String = "Pago Cancelado",
-    message: String = "La transacción ha sido anulada exitosamente.",
+fun SuccessResultScreen(
+    title: String = "¡Pago Confirmado!",
+    message: String = "Gracias por tu pago. Transacción ID: 123456789",
     onConfirm: () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = Orange
+        color = BlueLight
     ) {
         Column(
             modifier = Modifier
@@ -44,9 +49,9 @@ fun CancelSuccessScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.Close,
-                        contentDescription = "Cancelled",
-                        tint = Orange,
+                        imageVector = Icons.Filled.Check,
+                        contentDescription = "Success",
+                        tint = BlueMid,
                         modifier = Modifier.size(64.dp)
                     )
                 }
@@ -79,7 +84,7 @@ fun CancelSuccessScreen(
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = BlueMid)
             ) {
-                Text(text = "Aceptar", color = Color.White)
+                Text(text = "Finalizar", color = Color.White)
             }
         }
     }

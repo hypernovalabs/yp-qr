@@ -41,10 +41,7 @@ class MainActivity : ComponentActivity() {
 
             transactionHandler = TransactionHandler(
                 activity = this,
-                onSuccess = {
-                    Timber.d("✅ onSuccess callback: showSuccessScreen = true")
-                    showSuccessScreen = true
-                }
+                onSuccess = null // ✅ Ya no es necesario usarlo en MainActivity
             )
 
             MainContent(
