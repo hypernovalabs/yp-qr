@@ -28,6 +28,14 @@ fun MainScreen(navController: NavController) {
 
     val isOnline = remember { mutableStateOf(NetworkUtils.isConnected(context)) }
 
+    // Efecto para actualizar estado de red periódicamente (opcional)
+    LaunchedEffect(Unit) {
+        while (true) {
+            isOnline.value = NetworkUtils.isConnected(context)
+            kotlinx.coroutines.delay(3000)
+        }
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) }
