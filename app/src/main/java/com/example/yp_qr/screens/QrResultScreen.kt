@@ -35,15 +35,16 @@ import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.json.JSONObject
 import timber.log.Timber
+import org.json.JSONObject
 import java.text.NumberFormat
 import java.util.Locale
 
-private val PrimaryColor = ComposeColor(0xFF1E88E5)
-private val PrimaryDark = ComposeColor(0xFF1565C0)
-private val AccentColor = ComposeColor(0xFF42A5F5)
-private val ErrorColor = ComposeColor(0xFFFF7043)
+// Color palette
+private val PrimaryColor    = ComposeColor(0xFF1E88E5)
+private val PrimaryDark     = ComposeColor(0xFF1565C0)
+private val AccentColor     = ComposeColor(0xFF42A5F5)
+private val ErrorColor      = ComposeColor(0xFFFF7043)
 private val LightBackground = ComposeColor(0xFFF1F8FF)
 
 @Composable
@@ -56,61 +57,70 @@ fun QrResultScreen(
     onPaymentSuccess: () -> Unit
 ) {
     val context = LocalContext.current
+    // Format amount
     val formattedAmount = remember(amount) {
-        val value = amount.toDoubleOrNull() ?: 0.0
-        NumberFormat.getCurrencyInstance(Locale.US).format(value)
+        NumberFormat.getCurrencyInstance(Locale.US)
+            .format(amount.toDoubleOrNull() ?: 0.0)
     }
 
-    val config = LocalStorage.getConfig(context)
-    val token = config["device_token"] ?: ""
-    val apiKey = config["api_key"] ?: ""
-    val secretKey = config["secret_key"] ?: ""
-    val baseUrl = config["base_url"] ?: "https://api-integrationcheckout-uat.yappycloud.com/v1"
+    // Load credentials once
+    val config          = LocalStorage.getConfig(context)
+    val token           = config["device_token"] ?: ""
+    val apiKey          = config["api_key"] ?: ""
+    val secretKey       = config["secret_key"] ?: ""
+    val endpointForCurl = config["endpoint"]?.takeIf { it.isNotBlank() }
+        ?: "https://api-integrationcheckout-uat.yappycloud.com/v1"
 
-    val scrollState = rememberScrollState()
+    val scrollState    = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
-    var isCancelling by remember { mutableStateOf(false) }
-    var cancelError by remember { mutableStateOf<String?>(null) }
-    var currentStatus by remember { mutableStateOf("PENDING") }
+    var isCancelling   by remember { mutableStateOf(false) }
+    var cancelError    by remember { mutableStateOf<String?>(null) }
+    var currentStatus  by remember { mutableStateOf("PENDING") }
+    var rawApiResponse by remember { mutableStateOf<String?>(null) }
 
-    val isCheckingStatus = remember(currentStatus, isCancelling) {
-        currentStatus == "PENDING" && !isCancelling
-    }
+    val isCheckingStatus = currentStatus == "PENDING" && !isCancelling
 
-    LaunchedEffect(transactionId) {
+    // Polling transaction status
+    LaunchedEffect(transactionId, token, apiKey, secretKey) {
         while (true) {
             if (isCancelling) break
-            try {
-                val response = ApiService.getTransactionStatus(transactionId, token, apiKey, secretKey)
-                val json = JSONObject(response)
-                val status = json.optJSONObject("body")?.optString("status") ?: "STATUS_NOT_FOUND"
-                currentStatus = status
+            if (token.isBlank() || apiKey.isBlank() || secretKey.isBlank()) {
+                rawApiResponse = "Error: missing credentials for polling"
+                currentStatus  = "ERROR_CONFIG"
+                delay(10_000)
+                continue
+            }
 
-                when (status.uppercase()) {
-                    "COMPLETED" -> {
-                        onPaymentSuccess()
-                        break
-                    }
-                    "CANCELLED", "FAILED", "EXPIRED" -> {
-                        onCancelSuccess()
-                        break
-                    }
+            try {
+                val response = ApiService.getTransactionStatus(
+                    transactionId, token, apiKey, secretKey
+                )
+                rawApiResponse = response
+                val json       = JSONObject(response)
+                val statusBody = json.optJSONObject("body")
+                    ?.optString("status")
+                currentStatus  = statusBody.takeUnless { it.isNullOrBlank() }
+                    ?: json.optString("code", currentStatus)
+
+                when (currentStatus.uppercase(Locale.US)) {
+                    "COMPLETED"  -> { onPaymentSuccess(); break }
+                    "CANCELLED", "FAILED", "EXPIRED" -> { onCancelSuccess(); break }
                 }
             } catch (e: Exception) {
-                Timber.e(e, "Polling failed")
+                rawApiResponse = "Polling error: ${e.localizedMessage}"
+                currentStatus  = "POLLING_EXCEPTION"
             }
-            delay(5000)
+            delay(5_000)
         }
     }
 
+    // Screen content
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    colors = listOf(AccentColor, PrimaryDark),
-                    startY = 0f,
-                    endY = Float.POSITIVE_INFINITY
+                    colors = listOf(AccentColor, PrimaryDark)
                 )
             )
     ) {
@@ -122,60 +132,107 @@ fun QrResultScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             HeaderSection()
+            Spacer(Modifier.height(12.dp))
 
+            // Mostrar datos de transacción
+            Text(
+                text      = "Transacción: $transactionId",
+                fontSize  = 14.sp,
+                fontWeight= FontWeight.Medium,
+                color     = ComposeColor.White,
+                textAlign = TextAlign.Center,
+                modifier  = Modifier.fillMaxWidth()
+            )
+            Text(
+                text      = "Fecha: $date",
+                fontSize  = 14.sp,
+                fontWeight= FontWeight.Medium,
+                color     = ComposeColor.White,
+                textAlign = TextAlign.Center,
+                modifier  = Modifier.fillMaxWidth()
+            )
             Spacer(Modifier.height(12.dp))
 
             Text(
-                text = "Monto a pagar: $formattedAmount",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = ComposeColor.White,
+                text      = "Monto a pagar: $formattedAmount",
+                fontSize  = 20.sp,
+                fontWeight= FontWeight.Bold,
+                color     = ComposeColor.White,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
+                modifier  = Modifier.fillMaxWidth()
             )
 
             Spacer(Modifier.height(24.dp))
-            QrCodeWithBorder(hash = hash, size = 260, statusColor = PrimaryColor)
+            QrCodeWithBorder(hash, 260, PrimaryColor)
             Spacer(Modifier.height(24.dp))
 
             Text(
-                text = "Escanea este código para realizar tu pago",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = ComposeColor.White,
+                text      = "Escanea este código para realizar tu pago",
+                fontSize  = 18.sp,
+                fontWeight= FontWeight.SemiBold,
+                color     = ComposeColor.White,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
+                modifier  = Modifier.fillMaxWidth()
             )
 
             Spacer(Modifier.height(12.dp))
-
             Text(
-                text = "Estado actual: $currentStatus",
-                fontSize = 14.sp,
-                color = ComposeColor.White,
+                text      = "Estado actual: $currentStatus",
+                fontSize  = 14.sp,
+                color     = ComposeColor.White,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
+                modifier  = Modifier.fillMaxWidth()
             )
 
+            rawApiResponse?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text      = "Respuesta API:",
+                    fontSize  = 12.sp,
+                    fontWeight= FontWeight.Bold,
+                    color     = ComposeColor.LightGray,
+                    textAlign = TextAlign.Center,
+                    modifier  = Modifier.fillMaxWidth()
+                )
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    shape = RoundedCornerShape(4.dp),
+                    color = ComposeColor.Black.copy(alpha = 0.2f)
+                ) {
+                    Text(
+                        text      = it,
+                        fontSize  = 10.sp,
+                        color     = ComposeColor.White,
+                        textAlign = TextAlign.Start,
+                        modifier  = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp)
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
             Text(
-                text = "Token: ${token.take(20)}...",
-                fontSize = 10.sp,
-                color = ComposeColor.LightGray,
+                text      = "Device Token: ${token.take(20)}...",
+                fontSize  = 10.sp,
+                color     = ComposeColor.LightGray,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
+                modifier  = Modifier.fillMaxWidth()
             )
 
             if (isCheckingStatus) {
                 Spacer(Modifier.height(8.dp))
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment   = Alignment.CenterVertically,
+                    horizontalArrangement= Arrangement.Center,
+                    modifier            = Modifier.fillMaxWidth()
                 ) {
                     CircularProgressIndicator(
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.size(20.dp),
-                        color = ComposeColor.White
+                        strokeWidth=2.dp,
+                        modifier   = Modifier.size(20.dp),
+                        color      = ComposeColor.White
                     )
                     Spacer(Modifier.width(8.dp))
                     Text("Verificando estado...", color = ComposeColor.White, fontSize = 14.sp)
@@ -183,55 +240,55 @@ fun QrResultScreen(
             }
 
             Spacer(Modifier.height(32.dp))
-
+            // Cancel button
             Button(
                 onClick = {
                     coroutineScope.launch {
-                        if (currentStatus != "PENDING") {
-                            cancelError = "No se puede cancelar. Estado actual: $currentStatus"
-                            return@launch
-                        }
+                        if (currentStatus.uppercase(Locale.US) != "PENDING") return@launch
                         isCancelling = true
-                        cancelError = null
                         try {
-                            val result = ApiService.cancelTransaction(transactionId, token, apiKey, secretKey)
-                            if (result.contains("Error") || result.contains("Excepción")) {
-                                cancelError = "Error al cancelar: $result"
-                            } else {
-                                onCancelSuccess()
-                            }
+                            val result = ApiService.cancelTransaction(
+                                transactionId, token, apiKey, secretKey
+                            )
+                            rawApiResponse = result
+                            val cancelled = JSONObject(result)
+                                .optJSONObject("body")
+                                ?.optString("status")
+                                .equals("CANCELLED", true)
+                            if (cancelled) onCancelSuccess() else cancelError = "Error al cancelar"
                         } catch (e: Exception) {
-                            cancelError = "Error: ${e.localizedMessage}"
+                            cancelError    = "Excepción: ${e.localizedMessage}"
+                            rawApiResponse = cancelError
                         } finally {
                             isCancelling = false
                         }
                     }
                 },
                 enabled = !isCancelling,
-                colors = ButtonDefaults.buttonColors(containerColor = ComposeColor.White),
-                modifier = Modifier
+                colors  = ButtonDefaults.buttonColors(containerColor = ComposeColor.White),
+                modifier= Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 32.dp)
                     .height(48.dp)
             ) {
-                Text(
-                    text = if (isCancelling) "Cancelando..." else "Cancelar Pago",
-                    color = ErrorColor,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium
-                )
+                Text(if (isCancelling) "Cancelando..." else "Cancelar Pago", color = ErrorColor)
             }
 
-            // Botón para copiar el curl
+            Spacer(Modifier.height(8.dp))
+            // Copy cURL button
             Button(
                 onClick = {
-                    val curl = buildTransactionStatusCurl(baseUrl, transactionId, token, apiKey, secretKey)
-                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    val curl = buildTransactionStatusCurl(
+                        endpointForCurl, transactionId, token, apiKey, secretKey
+                    )
+                    val clipboard = context.getSystemService(
+                        Context.CLIPBOARD_SERVICE
+                    ) as ClipboardManager
                     clipboard.setPrimaryClip(ClipData.newPlainText("curl", curl))
-                    Toast.makeText(context, "Comando cURL copiado al portapapeles", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "cURL copiado", Toast.LENGTH_SHORT).show()
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = PrimaryColor),
-                modifier = Modifier
+                colors  = ButtonDefaults.buttonColors(containerColor = PrimaryColor),
+                modifier= Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 32.dp)
                     .height(48.dp)
@@ -239,23 +296,27 @@ fun QrResultScreen(
                 Text("📋 Copiar comando cURL", color = ComposeColor.White)
             }
 
-            cancelError?.let {
+            cancelError?.let { errorMsg ->
+                Spacer(Modifier.height(8.dp))
                 Text(
-                    text = it,
-                    color = ErrorColor,
-                    fontSize = 14.sp,
+                    text      = errorMsg,
+                    color     = ErrorColor,
+                    fontSize  = 14.sp,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier
+                    modifier  = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
                 )
             }
+
+            Spacer(Modifier.height(16.dp))
         }
     }
 }
 
 @Composable
 private fun HeaderSection() {
+    val painter = painterResource(id = R.drawable.yappy_logo)
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -263,10 +324,10 @@ private fun HeaderSection() {
         contentAlignment = Alignment.Center
     ) {
         Image(
-            painter = painterResource(id = R.drawable.yappy_logo),
-            contentDescription = "Logo Yappy",
-            modifier = Modifier.size(80.dp),
-            contentScale = ContentScale.Fit
+            painter         = painter,
+            contentDescription= "Logo Yappy",
+            modifier        = Modifier.size(80.dp),
+            contentScale    = ContentScale.Fit
         )
     }
 }
@@ -275,17 +336,18 @@ private fun HeaderSection() {
 private fun QrCodeWithBorder(hash: String, size: Int, statusColor: ComposeColor) {
     Card(
         modifier = Modifier.size((size + 32).dp),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = LightBackground),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        shape    = RoundedCornerShape(20.dp),
+        colors   = CardDefaults.cardColors(containerColor = LightBackground),
+        elevation= CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(12.dp)
+                .padding(16.dp)
                 .background(
-                    Brush.radialGradient(
-                        colors = listOf(statusColor.copy(alpha = 0.1f), LightBackground)
+                    brush = Brush.radialGradient(
+                        colors = listOf(statusColor.copy(alpha = 0.05f), LightBackground),
+                        radius = size.toFloat() * 0.75f
                     )
                 ),
             contentAlignment = Alignment.Center
@@ -300,21 +362,27 @@ private fun QrCode(hash: String, size: Int) {
     val qrBitmap = remember(hash) { generateQRCode(hash, size, size) }
     if (qrBitmap != null) {
         Image(
-            bitmap = qrBitmap.asImageBitmap(),
-            contentDescription = "QR Code",
-            modifier = Modifier.size(size.dp)
+            bitmap            = qrBitmap.asImageBitmap(),
+            contentDescription= "QR Code",
+            modifier          = Modifier.size(size.dp)
         )
     } else {
         Card(
             modifier = Modifier.size(size.dp),
-            colors = CardDefaults.cardColors(containerColor = ErrorColor.copy(alpha = 0.1f))
+            shape    = RoundedCornerShape(8.dp),
+            colors   = CardDefaults.cardColors(containerColor = ErrorColor.copy(alpha = 0.1f))
         ) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .padding(8.dp),
+                contentAlignment = Alignment.Center
+            ) {
                 Text(
-                    text = "Error al generar el código",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = ErrorColor,
-                    modifier = Modifier.padding(8.dp)
+                    text      = "Error al generar QR",
+                    style     = MaterialTheme.typography.bodyMedium.copy(fontSize = (size / 15).sp),
+                    color     = ErrorColor,
+                    textAlign = TextAlign.Center
                 )
             }
         }
@@ -322,6 +390,7 @@ private fun QrCode(hash: String, size: Int) {
 }
 
 private fun generateQRCode(text: String, width: Int, height: Int): Bitmap? {
+    if (text.isBlank()) return null
     return try {
         val matrix: BitMatrix = MultiFormatWriter().encode(text, BarcodeFormat.QR_CODE, width, height)
         Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
@@ -332,7 +401,7 @@ private fun generateQRCode(text: String, width: Int, height: Int): Bitmap? {
             }
         }
     } catch (e: Exception) {
-        Timber.e(e, "Error generating QR bitmap")
+        Timber.e(e, "Error generating QR bitmap for text: $text")
         null
     }
 }

@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONException
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.net.HttpURLConnection
@@ -106,14 +107,19 @@ object ApiService {
         }
     }
 
+    /**
+     * Genera un QR dinámico y extrae el transactionId que devuelve Yappy.
+     *
+     * @return Triple<localOrderId, yappyTransactionId, fullResponseJson>
+     */
     suspend fun generateQrWithToken(
         endpoint: String,
         token: String,
         apiKey: String,
         secretKey: String,
         inputValue: Double
-    ): Pair<String, String> {
-        val orderId = "ORD-${System.currentTimeMillis()}"
+    ): Triple<String, String, String> {
+        val localOrderId = "ORD-${System.currentTimeMillis()}"
         val subTotal = inputValue
         val tax = 0.0
         val total = inputValue
@@ -127,7 +133,7 @@ object ApiService {
                     put("discount", 0)
                     put("total", total)
                 })
-                put("order_id", orderId)
+                put("order_id", localOrderId)
                 put("description", "Pago generado desde app")
             })
         }
@@ -144,7 +150,31 @@ object ApiService {
             body = body
         )
 
-        return Pair(orderId, response)
+        return try {
+            val jsonResponse = JSONObject(response)
+            val yappyTransactionId = jsonResponse
+                .optJSONObject("body")
+                ?.optString("transactionId")
+                .orEmpty()
+
+            if (yappyTransactionId.isBlank()) {
+                Log.e(
+                    "ApiService",
+                    "💥 Yappy transactionId no encontrado en generateQrWithToken, response=$response"
+                )
+                // Fallback: devolvemos localOrderId y cadena vacía para transactionId
+                Triple(localOrderId, "", response)
+            } else {
+                Log.d(
+                    "ApiService",
+                    "✅ QR generado. localOrderId=$localOrderId, yappyTransactionId=$yappyTransactionId"
+                )
+                Triple(localOrderId, yappyTransactionId, response)
+            }
+        } catch (e: JSONException) {
+            Log.e("ApiService", "💥 Error al parsear JSON en generateQrWithToken", e)
+            Triple(localOrderId, "", response)
+        }
     }
 
     suspend fun cancelTransaction(
@@ -171,11 +201,7 @@ object ApiService {
         apiKey: String,
         secretKey: String
     ): String {
-        Log.d("ApiService", "📡 Llamando getTransactionStatus con:")
-        Log.d("ApiService", "🧾 txnId=$transactionId")
-        Log.d("ApiService", "🔑 token=$token")
-        Log.d("ApiService", "🔐 apiKey=$apiKey")
-        Log.d("ApiService", "🔐 secretKey=$secretKey")
+        Log.d("ApiService", "📡 Llamando getTransactionStatus con: txnId=$transactionId")
 
         val response = makeRequest(
             urlString = "${ApiConfig.BASE_URL}/transaction/$transactionId",
@@ -189,7 +215,6 @@ object ApiService {
         )
 
         Log.d("ApiService", "📥 Respuesta bruta de getTransactionStatus:\n$response")
-
         return response
     }
 

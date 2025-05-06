@@ -50,8 +50,19 @@ class TransactionHandler(
                 isLoading.value = true
                 val token = openSession(activity)
                 LocalStorage.saveToken(activity, token)
-                val (orderId, responseJson) = generateQr(token, amountValue)
-                handleQrResponse(orderId, responseJson, dateValue, amountValue)
+
+                // CAMBIO: generar QR devuelve ahora Triple(localOrderId, yappyTransactionId, responseJson)
+                val (localOrderId, yappyTransactionId, responseJson) = generateQr(token, amountValue)
+
+                if (yappyTransactionId.isBlank()) {
+                    Timber.e("TransactionHandler: No se pudo obtener el yappyTransactionId de la generación del QR.")
+                    ErrorHandler.showErrorDialog(activity, "Error de Comunicación", "No se pudo obtener el identificador de la transacción de Yappy.") {
+                        finishWithCancel()
+                    }
+                    return@launch
+                }
+
+                handleQrResponse(localOrderId, yappyTransactionId, responseJson, dateValue, amountValue)
             } catch (e: Exception) {
                 handleTransactionError(e)
             } finally {
@@ -75,11 +86,13 @@ class TransactionHandler(
         }
     }
 
-    private suspend fun generateQr(token: String, amountValue: Double): Pair<String, String> {
+    private suspend fun generateQr(token: String, amountValue: Double): Triple<String, String, String> {
         val config = LocalStorage.getConfig(activity)
         val qrEndpoint = "${ApiConfig.BASE_URL}/qr/generate/DYN"
-        Timber.d("⚙️ Generating QR with endpoint=%s, apiKey=%s, secretKey=%s, inputValue=%s",
-            qrEndpoint, config["api_key"], config["secret_key"], amountValue)
+        Timber.d(
+            "⚙️ Generating QR with endpoint=%s, apiKey=%s, secretKey=%s, inputValue=%s",
+            qrEndpoint, config["api_key"], config["secret_key"], amountValue
+        )
         return ApiService.generateQrWithToken(
             endpoint = qrEndpoint,
             token = token,
@@ -90,7 +103,8 @@ class TransactionHandler(
     }
 
     private fun handleQrResponse(
-        orderId: String,
+        localOrderId: String,
+        yappyTransactionId: String,
         responseJson: String,
         dateValue: String,
         amountValue: Double
@@ -99,7 +113,8 @@ class TransactionHandler(
         if (json.has("body")) {
             val body = json.getJSONObject("body")
             val resultHash = body.optString("hash")
-            Timber.d("✅ QR generated: hash=%s", resultHash)
+            val yappyDate = body.optString("date", dateValue)
+            Timber.d("✅ QR generated for Yappy TxnID: %s, hash: %s", yappyTransactionId, resultHash)
 
             val dm = activity.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
             val displays = dm.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
@@ -107,22 +122,19 @@ class TransactionHandler(
             if (displays.isNotEmpty()) {
                 Timber.d("🖥️ Displaying QR on secondary screen")
                 QrPresentation(activity, resultHash).show()
-                activity.finish() // <-- ✅ Cierra MainActivity para evitar superposición
+                activity.finish()
             } else {
                 Timber.d("📱 Displaying QR in QrResultActivity")
                 val qrIntent = Intent(activity, QrResultActivity::class.java).apply {
                     putExtra("qrHash", resultHash)
-                    putExtra("qrTransactionId", orderId)
-                    putExtra("qrDate", dateValue)
+                    putExtra("qrTransactionId", yappyTransactionId)
+                    putExtra("qrDate", yappyDate)
                     putExtra("qrAmount", amountValue.toString())
+                    putExtra("localOrderId", localOrderId)
                 }
                 activity.startActivity(qrIntent)
-                activity.finish() // <-- ✅ Cierra MainActivity después de mostrar QR
+                activity.finish()
             }
-
-            // ⛔ Ya no mostramos SuccessScreen desde MainActivity
-            // onSuccess?.invoke() ← REMOVIDO
-
         } else {
             val msg = json.optString("message", "Error desconocido al generar QR")
             Timber.e("⚠️ Response missing 'body': %s", msg)
@@ -163,7 +175,7 @@ class TransactionHandler(
             ?: "0"
         var amount = amountStr.toDoubleOrNull() ?: 0.0
         if (amount >= 100) {
-            Timber.d("↔️ Ajustando amount de $amount centavos a ${amount / 100}")
+            Timber.d("↔️ Ajustando amount de $amount centavos a ${'$'}{amount / 100}")
             amount /= 100.0
         }
         if (amount <= 0) {

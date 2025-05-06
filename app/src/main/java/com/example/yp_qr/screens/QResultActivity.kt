@@ -8,9 +8,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.tefbanesco.storage.LocalStorage
 import com.example.tefbanesco.network.ApiService
-//import com.example.tefbanesco.screens.CancelSuccessScreen
-//import com.example.tefbanesco.screens.SuccessScreen
-//import com.example.tefbanesco.screens.QrResultScreen
+import com.example.tefbanesco.screens.CancelResultScreen
+import com.example.tefbanesco.screens.SuccessResultScreen
+import com.example.tefbanesco.screens.QrResultScreen
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -18,10 +18,11 @@ class QrResultActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val date           = intent.getStringExtra("qrDate") ?: ""
-        val transactionId  = intent.getStringExtra("qrTransactionId") ?: ""
-        val hash           = intent.getStringExtra("qrHash") ?: ""
-        val amount         = intent.getStringExtra("qrAmount") ?: ""
+        // Extraemos la fecha y el transactionId que ahora viene de Yappy
+        val qrDate             = intent.getStringExtra("qrDate") ?: ""
+        val yappyTransactionId = intent.getStringExtra("qrTransactionId") ?: ""
+        val qrHash             = intent.getStringExtra("qrHash") ?: ""
+        val qrAmount           = intent.getStringExtra("qrAmount") ?: ""
 
         setContent {
             val context = LocalContext.current
@@ -34,14 +35,14 @@ class QrResultActivity : ComponentActivity() {
                 // 1) Pantalla de cancelación
                 showCancelSuccess -> CancelResultScreen(
                     title = "Pago Cancelado",
-                    message = "El pago fue cancelado exitosamente.",
+                    message = "La transacción $yappyTransactionId fue cancelada exitosamente.",
                     onConfirm = { finish() }
                 )
 
                 // 2) Pantalla de éxito
                 showPaymentSuccess -> SuccessResultScreen(
                     title = "Pago Confirmado",
-                    message = "El pago se completó exitosamente.",
+                    message = "La transacción $yappyTransactionId se completó exitosamente.",
                     onConfirm = {
                         Timber.d("✅ SuccessScreen onConfirm: cerrando Activity")
                         finish()
@@ -50,22 +51,20 @@ class QrResultActivity : ComponentActivity() {
 
                 // 3) Pantalla QR con polling y cancelación
                 else -> QrResultScreen(
-                    date            = date,
-                    transactionId   = transactionId,
-                    hash            = hash,
-                    amount          = amount,
+                    date            = qrDate,
+                    transactionId   = yappyTransactionId,
+                    hash            = qrHash,
+                    amount          = qrAmount,
                     onCancelSuccess = {
-                        Timber.d("🔔 QrResultActivity - onCancelSuccess: txn=$transactionId")
+                        Timber.d("🔔 QrResultActivity - onCancelSuccess: txn=$yappyTransactionId")
                         showCancelSuccess = true
                     },
                     onPaymentSuccess = {
-                        Timber.d("🔔 QrResultActivity - onPaymentSuccess: txn=$transactionId")
-                        // 2 acciones tras el pago:
+                        Timber.d("🔔 QrResultActivity - onPaymentSuccess: txn=$yappyTransactionId")
                         coroutineScope.launch {
                             // a) Cerrar sesión de dispositivo
                             try {
-                                // Recuperar credenciales
-                                val cfg = LocalStorage.getConfig(context)
+                                val cfg       = LocalStorage.getConfig(context)
                                 val token     = cfg["device_token"].orEmpty()
                                 val apiKey    = cfg["api_key"].orEmpty()
                                 val secretKey = cfg["secret_key"].orEmpty()
@@ -74,11 +73,10 @@ class QrResultActivity : ComponentActivity() {
                             } catch (e: Exception) {
                                 Timber.e(e, "❌ Error cerrando sesión")
                             }
-                            // b) Limpiar token y demás prefs
+                            // b) Limpiar prefs
                             LocalStorage.clear(context)
                             Timber.d("🧹 LocalStorage limpiado")
 
-                            // Mostrar pantalla de éxito
                             showPaymentSuccess = true
                         }
                     }
