@@ -171,7 +171,13 @@ object ApiService {
         apiKey: String,
         secretKey: String
     ): String {
-        return makeRequest(
+        Log.d("ApiService", "📡 Llamando getTransactionStatus con:")
+        Log.d("ApiService", "🧾 txnId=$transactionId")
+        Log.d("ApiService", "🔑 token=$token")
+        Log.d("ApiService", "🔐 apiKey=$apiKey")
+        Log.d("ApiService", "🔐 secretKey=$secretKey")
+
+        val response = makeRequest(
             urlString = "${ApiConfig.BASE_URL}/transaction/$transactionId",
             method = "GET",
             headers = mapOf(
@@ -181,6 +187,10 @@ object ApiService {
                 "secret-key" to secretKey
             )
         )
+
+        Log.d("ApiService", "📥 Respuesta bruta de getTransactionStatus:\n$response")
+
+        return response
     }
 
     suspend fun closeDeviceSession(
