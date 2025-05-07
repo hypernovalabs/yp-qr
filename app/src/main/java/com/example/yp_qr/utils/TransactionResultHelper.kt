@@ -84,7 +84,8 @@ object TransactionResultHelper {
         resultIntent.putExtra("ErrorMessage", errorMessage)
 
         val transactionDataJson = JSONObject().apply {
-            yappyTransactionId?.takeIf { it.isNotBlank() }?.let { put("yappyTransactionId", it) }
+            yappyTransactionId?.takeIf { it.isNotBlank() }?.let { put("yappyTransacti'" +
+                    "onId", it) }
             localOrderId?.takeIf { it.isNotBlank() }?.let { put("localOrderId", it) }
         }.toString()
         resultIntent.putExtra("TransactionData", transactionDataJson.take(250))
