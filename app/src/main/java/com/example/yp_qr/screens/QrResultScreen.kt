@@ -68,15 +68,13 @@ fun QrResultScreen(
     val token           = config["device_token"] ?: ""
     val apiKey          = config["api_key"] ?: ""
     val secretKey       = config["secret_key"] ?: ""
-    val endpointForCurl = config["endpoint"]?.takeIf { it.isNotBlank() }
-        ?: "https://api-integrationcheckout-uat.yappycloud.com/v1"
 
     val scrollState    = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
     var isCancelling   by remember { mutableStateOf(false) }
     var cancelError    by remember { mutableStateOf<String?>(null) }
     var currentStatus  by remember { mutableStateOf("PENDING") }
-    var rawApiResponse by remember { mutableStateOf<String?>(null) }
+    var rawApiResponse by remember { mutableStateOf<String?>(null) } // Keep for debugging if needed, though not displayed
 
     val isCheckingStatus = currentStatus == "PENDING" && !isCancelling
 
@@ -87,7 +85,7 @@ fun QrResultScreen(
             if (token.isBlank() || apiKey.isBlank() || secretKey.isBlank()) {
                 rawApiResponse = "Error: missing credentials for polling"
                 currentStatus  = "ERROR_CONFIG"
-                delay(10_000)
+                delay(10_000) // Wait longer on config error
                 continue
             }
 
@@ -95,12 +93,12 @@ fun QrResultScreen(
                 val response = ApiService.getTransactionStatus(
                     transactionId, token, apiKey, secretKey
                 )
-                rawApiResponse = response
+                rawApiResponse = response // Keep for debugging
                 val json       = JSONObject(response)
                 val statusBody = json.optJSONObject("body")
                     ?.optString("status")
                 currentStatus  = statusBody.takeUnless { it.isNullOrBlank() }
-                    ?: json.optString("code", currentStatus)
+                    ?: json.optString("code", currentStatus) // Fallback to code if body status is null/blank
 
                 when (currentStatus.uppercase(Locale.US)) {
                     "COMPLETED"  -> { onPaymentSuccess(); break }
@@ -110,7 +108,7 @@ fun QrResultScreen(
                 rawApiResponse = "Polling error: ${e.localizedMessage}"
                 currentStatus  = "POLLING_EXCEPTION"
             }
-            delay(5_000)
+            delay(5_000) // Poll every 5 seconds
         }
     }
 
@@ -132,25 +130,6 @@ fun QrResultScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             HeaderSection()
-            Spacer(Modifier.height(12.dp))
-
-            // Mostrar datos de transacción
-            Text(
-                text      = "Transacción: $transactionId",
-                fontSize  = 14.sp,
-                fontWeight= FontWeight.Medium,
-                color     = ComposeColor.White,
-                textAlign = TextAlign.Center,
-                modifier  = Modifier.fillMaxWidth()
-            )
-            Text(
-                text      = "Fecha: $date",
-                fontSize  = 14.sp,
-                fontWeight= FontWeight.Medium,
-                color     = ComposeColor.White,
-                textAlign = TextAlign.Center,
-                modifier  = Modifier.fillMaxWidth()
-            )
             Spacer(Modifier.height(12.dp))
 
             Text(
@@ -184,44 +163,6 @@ fun QrResultScreen(
                 modifier  = Modifier.fillMaxWidth()
             )
 
-            rawApiResponse?.let {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text      = "Respuesta API:",
-                    fontSize  = 12.sp,
-                    fontWeight= FontWeight.Bold,
-                    color     = ComposeColor.LightGray,
-                    textAlign = TextAlign.Center,
-                    modifier  = Modifier.fillMaxWidth()
-                )
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    shape = RoundedCornerShape(4.dp),
-                    color = ComposeColor.Black.copy(alpha = 0.2f)
-                ) {
-                    Text(
-                        text      = it,
-                        fontSize  = 10.sp,
-                        color     = ComposeColor.White,
-                        textAlign = TextAlign.Start,
-                        modifier  = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp)
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text      = "Device Token: ${token.take(20)}...",
-                fontSize  = 10.sp,
-                color     = ComposeColor.LightGray,
-                textAlign = TextAlign.Center,
-                modifier  = Modifier.fillMaxWidth()
-            )
-
             if (isCheckingStatus) {
                 Spacer(Modifier.height(8.dp))
                 Row(
@@ -244,13 +185,13 @@ fun QrResultScreen(
             Button(
                 onClick = {
                     coroutineScope.launch {
-                        if (currentStatus.uppercase(Locale.US) != "PENDING") return@launch
+                        if (currentStatus.uppercase(Locale.US) != "PENDING") return@launch // Only allow cancelling PENDING
                         isCancelling = true
                         try {
                             val result = ApiService.cancelTransaction(
                                 transactionId, token, apiKey, secretKey
                             )
-                            rawApiResponse = result
+                            rawApiResponse = result // Keep for debugging
                             val cancelled = JSONObject(result)
                                 .optJSONObject("body")
                                 ?.optString("status")
@@ -258,42 +199,20 @@ fun QrResultScreen(
                             if (cancelled) onCancelSuccess() else cancelError = "Error al cancelar"
                         } catch (e: Exception) {
                             cancelError    = "Excepción: ${e.localizedMessage}"
-                            rawApiResponse = cancelError
+                            rawApiResponse = cancelError // Keep for debugging
                         } finally {
                             isCancelling = false
                         }
                     }
                 },
-                enabled = !isCancelling,
+                enabled = !isCancelling && currentStatus.uppercase(Locale.US) == "PENDING", // Only enabled if not cancelling and status is PENDING
                 colors  = ButtonDefaults.buttonColors(containerColor = ComposeColor.White),
                 modifier= Modifier
-                    .fillMaxWidth()
                     .padding(horizontal = 32.dp)
+                    .fillMaxWidth() // Make button fill width
                     .height(48.dp)
             ) {
                 Text(if (isCancelling) "Cancelando..." else "Cancelar Pago", color = ErrorColor)
-            }
-
-            Spacer(Modifier.height(8.dp))
-            // Copy cURL button
-            Button(
-                onClick = {
-                    val curl = buildTransactionStatusCurl(
-                        endpointForCurl, transactionId, token, apiKey, secretKey
-                    )
-                    val clipboard = context.getSystemService(
-                        Context.CLIPBOARD_SERVICE
-                    ) as ClipboardManager
-                    clipboard.setPrimaryClip(ClipData.newPlainText("curl", curl))
-                    Toast.makeText(context, "cURL copiado", Toast.LENGTH_SHORT).show()
-                },
-                colors  = ButtonDefaults.buttonColors(containerColor = PrimaryColor),
-                modifier= Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 32.dp)
-                    .height(48.dp)
-            ) {
-                Text("📋 Copiar comando cURL", color = ComposeColor.White)
             }
 
             cancelError?.let { errorMsg ->
@@ -320,13 +239,14 @@ private fun HeaderSection() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(80.dp),
+            // Adjust height to accommodate larger logo if needed, or let Box wrap content
+            .padding(vertical = 16.dp), // Add some vertical padding
         contentAlignment = Alignment.Center
     ) {
         Image(
             painter         = painter,
             contentDescription= "Logo Yappy",
-            modifier        = Modifier.size(80.dp),
+            modifier        = Modifier.size(120.dp), // Increased logo size here
             contentScale    = ContentScale.Fit
         )
     }
