@@ -1,7 +1,7 @@
-package com.example.tefbanesco.utils
+package com.example.yappy.utils
 
 /**
- * Clase para representar la información de un código de estado de tefbanesco.
+ * Clase para representar la información de un código de estado de yappy.
  *
  * @param code Código de estado (formato YP-XXXX)
  * @param name Nombre identificativo del código (según documentación)
@@ -18,10 +18,10 @@ data class StatusCodeInfo(
 )
 
 /**
- * Clase que contiene todos los códigos de estado de la API tefbanesco
+ * Clase que contiene todos los códigos de estado de la API yappy
  * y funciones útiles para su gestión, basados en la documentación visual proporcionada.
  */
-object tefbanescoStatusCodes {
+object yappyStatusCodes {
     // Lista completa de todos los códigos según la imagen de referencia.
     // NOTA: La estructura Map usa el 'code' como clave única. Códigos como YP-0000 y YP-0200
     // aparecen en múltiples categorías en la imagen, pero aquí solo se puede almacenar una entrada.

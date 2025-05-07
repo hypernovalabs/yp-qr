@@ -1,4 +1,4 @@
-package com.example.tefbanesco.ui.theme
+package com.example.yappy.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

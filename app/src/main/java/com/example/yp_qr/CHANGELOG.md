@@ -1,4 +1,4 @@
-# 📦 CHANGELOG - tefbanesco Payment Integration Module
+# 📦 CHANGELOG - yappy Payment Integration Module
 
 Registro de cambios del módulo de integración de pagos QR.
 

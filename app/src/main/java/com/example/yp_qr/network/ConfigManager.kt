@@ -1,7 +1,7 @@
-package com.example.tefbanesco.network
+package com.example.yappy.network
 
 import android.content.Context
-import com.example.tefbanesco.storage.LocalStorage
+import com.example.yappy.storage.LocalStorage
 
 object ConfigManager {
 

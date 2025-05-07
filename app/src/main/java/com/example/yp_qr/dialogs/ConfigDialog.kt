@@ -1,4 +1,4 @@
-package com.example.tefbanesco.dialogs
+package com.example.yappy.dialogs
 
 import android.content.Context
 import androidx.compose.foundation.layout.*
@@ -13,8 +13,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import com.example.tefbanesco.network.ConfigManager
-import com.example.tefbanesco.network.ConfigNetworkHelper
+import com.example.yappy.network.ConfigManager
+import com.example.yappy.network.ConfigNetworkHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 

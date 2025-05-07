@@ -1,11 +1,11 @@
-package com.example.tefbanesco.intenthandlers
+package com.example.yappy.intenthandlers
 
 import android.app.Activity
 import android.content.Intent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import com.example.tefbanesco.dialogs.ConfigDialog
-import com.example.tefbanesco.ui.theme.YpqrTheme
+import com.example.yappy.dialogs.ConfigDialog
+import com.example.yappy.ui.theme.YpqrTheme
 
 class ShowSetupHandler(private val activity: Activity) {
 
@@ -25,13 +25,13 @@ class ShowSetupHandler(private val activity: Activity) {
     }
 
     private fun finishOk() {
-        val result = Intent("icg.actions.electronicpayment.tefbanesco.SHOW_SETUP_SCREEN")
+        val result = Intent("icg.actions.electronicpayment.yappy.SHOW_SETUP_SCREEN")
         activity.setResult(Activity.RESULT_OK, result)
         activity.finish()
     }
 
     private fun fail(message: String) {
-        val result = Intent("icg.actions.electronicpayment.tefbanesco.SHOW_SETUP_SCREEN")
+        val result = Intent("icg.actions.electronicpayment.yappy.SHOW_SETUP_SCREEN")
         result.putExtra("ErrorMessage", message)
         activity.setResult(Activity.RESULT_CANCELED, result)
         activity.finish()

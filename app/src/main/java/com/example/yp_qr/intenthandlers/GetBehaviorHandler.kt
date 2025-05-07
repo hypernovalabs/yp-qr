@@ -1,4 +1,4 @@
-package com.example.tefbanesco.intenthandlers
+package com.example.yappy.intenthandlers
 
 import android.app.Activity
 import android.content.Intent
@@ -6,7 +6,7 @@ import android.content.Intent
 class GetBehaviorHandler(private val activity: Activity) {
 
     fun handle() {
-        val result = Intent("icg.actions.electronicpayment.tefbanesco.GET_BEHAVIOR").apply {
+        val result = Intent("icg.actions.electronicpayment.yappy.GET_BEHAVIOR").apply {
             putExtra("SupportsTransactionVoid", false)
             putExtra("SupportsTransactionQuery", false)
             putExtra("SupportsNegativeSales", false)

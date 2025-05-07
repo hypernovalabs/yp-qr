@@ -1,4 +1,4 @@
-//package com.example.tefbanesco.dialogs
+//package com.example.yappy.dialogs
 //
 //import android.util.Log
 //import android.widget.Toast
@@ -12,9 +12,9 @@
 //import androidx.compose.ui.platform.LocalContext
 //import androidx.compose.ui.unit.dp
 //import androidx.compose.ui.window.Dialog
-//import com.example.tefbanesco.network.ApiConfig
-//import com.example.tefbanesco.network.ApiService
-//import com.example.tefbanesco.storage.LocalStorage
+//import com.example.yappy.network.ApiConfig
+//import com.example.yappy.network.ApiService
+//import com.example.yappy.storage.LocalStorage
 //import kotlinx.coroutines.launch
 //import org.json.JSONObject
 //

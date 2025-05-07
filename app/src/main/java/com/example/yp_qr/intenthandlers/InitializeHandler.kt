@@ -1,9 +1,9 @@
-package com.example.tefbanesco.intenthandlers
+package com.example.yappy.intenthandlers
 
 import android.app.Activity
 import android.content.Intent
-import com.example.tefbanesco.storage.LocalStorage
-import com.example.tefbanesco.errors.ErrorHandler // ✅ Importamos ErrorHandler
+import com.example.yappy.storage.LocalStorage
+import com.example.yappy.errors.ErrorHandler // ✅ Importamos ErrorHandler
 import kotlinx.coroutines.runBlocking
 import org.xmlpull.v1.XmlPullParserFactory
 
@@ -15,7 +15,7 @@ class InitializeHandler(private val activity: Activity) {
         if (parametersXml.isNullOrBlank()) {
             // No finalizar si no vienen parámetros válidos
             ErrorHandler.showConfigurationError(activity) {
-                val result = Intent("icg.actions.electronicpayment.tefbanesco.INITIALIZE")
+                val result = Intent("icg.actions.electronicpayment.yappy.INITIALIZE")
                 result.putExtra("ErrorMessage", "No se recibieron parámetros")
                 activity.setResult(Activity.RESULT_CANCELED, result)
                 // NO hacemos finish aquí
@@ -38,7 +38,7 @@ class InitializeHandler(private val activity: Activity) {
                 )
             }
 
-            val result = Intent("icg.actions.electronicpayment.tefbanesco.INITIALIZE")
+            val result = Intent("icg.actions.electronicpayment.yappy.INITIALIZE")
             activity.setResult(Activity.RESULT_OK, result)
             activity.finish() // ✅ Ahora sí cerramos solo si todo salió bien
 
@@ -49,7 +49,7 @@ class InitializeHandler(private val activity: Activity) {
 
     private fun fail(message: String) {
         ErrorHandler.showConfigurationError(activity) {
-            val result = Intent("icg.actions.electronicpayment.tefbanesco.INITIALIZE")
+            val result = Intent("icg.actions.electronicpayment.yappy.INITIALIZE")
             result.putExtra("ErrorMessage", message)
             activity.setResult(Activity.RESULT_CANCELED, result)
             activity.finish()

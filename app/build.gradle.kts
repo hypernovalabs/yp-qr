@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.tefbanesco"
+    namespace = "com.example.yappy"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.tefbanesco"
+        applicationId = "com.example.yappy"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

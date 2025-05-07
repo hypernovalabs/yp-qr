@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    package="com.example.tefbanesco">
+    package="com.example.yappy">
 
     <!-- ✅ Permisos necesarios -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -28,7 +28,7 @@
 
             <!-- 💳 Solo este intent lanza la app -->
             <intent-filter>
-                <action android:name="icg.actions.electronicpayment.tefbanesco.TRANSACTION" />
+                <action android:name="icg.actions.electronicpayment.yappy.TRANSACTION" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
 
@@ -53,11 +53,11 @@
             android:enabled="true">
             <intent-filter>
                 <action android:name="icg.actions.electronicpayment.none.INITIALIZE" />
-                <action android:name="icg.actions.electronicpayment.tefbanesco.SHOW_SETUP_SCREEN" />
-                <action android:name="icg.actions.electronicpayment.tefbanesco.FINALIZE" />
-                <action android:name="icg.actions.electronicpayment.tefbanesco.GET_VERSION" />
-                <action android:name="icg.actions.electronicpayment.tefbanesco.GET_BEHAVIOR" />
-                <action android:name="icg.actions.electronicpayment.tefbanesco.GET_CUSTOM_PARAMS" />
+                <action android:name="icg.actions.electronicpayment.yappy.SHOW_SETUP_SCREEN" />
+                <action android:name="icg.actions.electronicpayment.yappy.FINALIZE" />
+                <action android:name="icg.actions.electronicpayment.yappy.GET_VERSION" />
+                <action android:name="icg.actions.electronicpayment.yappy.GET_BEHAVIOR" />
+                <action android:name="icg.actions.electronicpayment.yappy.GET_CUSTOM_PARAMS" />
             </intent-filter>
         </receiver>
 

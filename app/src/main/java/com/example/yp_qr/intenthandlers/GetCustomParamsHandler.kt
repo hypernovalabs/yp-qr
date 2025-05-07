@@ -1,4 +1,4 @@
-package com.example.tefbanesco.intenthandlers
+package com.example.yappy.intenthandlers
 
 import android.app.Activity
 import android.content.Intent
@@ -10,7 +10,7 @@ import android.util.Base64
 class GetCustomParamsHandler(private val activity: Activity) {
 
     fun handle() {
-        val result = Intent("icg.actions.electronicpayment.tefbanesco.GET_CUSTOM_PARAMS").apply {
+        val result = Intent("icg.actions.electronicpayment.yappy.GET_CUSTOM_PARAMS").apply {
             putExtra("Name", "YAPPY-QR")
 
             // Cargar logo desde recursos (res/drawable) y convertirlo a Base64

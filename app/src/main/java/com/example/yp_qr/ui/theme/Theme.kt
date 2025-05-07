@@ -1,4 +1,4 @@
-package com.example.tefbanesco.ui.theme
+package com.example.yappy.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme

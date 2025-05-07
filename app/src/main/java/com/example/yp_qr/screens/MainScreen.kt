@@ -1,4 +1,4 @@
-package com.example.tefbanesco.screens
+package com.example.yappy.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -13,9 +13,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.example.tefbanesco.components.SquareButton
-import com.example.tefbanesco.dialogs.ConfigDialog
-import com.example.tefbanesco.network.NetworkUtils
+import com.example.yappy.components.SquareButton
+import com.example.yappy.dialogs.ConfigDialog
+import com.example.yappy.network.NetworkUtils
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 

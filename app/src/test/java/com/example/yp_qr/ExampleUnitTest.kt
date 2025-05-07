@@ -1,4 +1,4 @@
-package com.example.tefbanesco
+package com.example.yappy
 
 import org.junit.Test
 

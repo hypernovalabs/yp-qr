@@ -1,4 +1,4 @@
-package com.example.tefbanesco.intenthandlers
+package com.example.yappy.intenthandlers
 
 import android.app.Activity
 import android.content.Context
@@ -6,14 +6,14 @@ import android.content.Intent
 import android.hardware.display.DisplayManager
 import android.widget.Toast
 import androidx.compose.runtime.mutableStateOf
-import com.example.tefbanesco.errors.ErrorHandler
-import com.example.tefbanesco.network.ApiConfig
-import com.example.tefbanesco.network.ApiService
-import com.example.tefbanesco.presentation.QrPresentation
-import com.example.tefbanesco.screens.QrResultActivity // Asegúrate que esta clase tenga las constantes
-import com.example.tefbanesco.screens.TefTransactionResults // Importar las constantes
-import com.example.tefbanesco.storage.LocalStorage
-import com.example.tefbanesco.utils.ErrorUtils
+import com.example.yappy.errors.ErrorHandler
+import com.example.yappy.network.ApiConfig
+import com.example.yappy.network.ApiService
+import com.example.yappy.presentation.QrPresentation
+import com.example.yappy.screens.QrResultActivity // Asegúrate que esta clase tenga las constantes
+import com.example.yappy.screens.TefTransactionResults // Importar las constantes
+import com.example.yappy.storage.LocalStorage
+import com.example.yappy.utils.ErrorUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

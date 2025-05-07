@@ -1,5 +1,5 @@
 // File: utils/CurlUtils.kt
-package com.example.tefbanesco.utils
+package com.example.yappy.utils
 
 fun buildTransactionStatusCurl(
     baseUrl: String,

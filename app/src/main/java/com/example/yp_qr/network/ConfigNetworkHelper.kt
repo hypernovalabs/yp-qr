@@ -1,9 +1,9 @@
-package com.example.tefbanesco.network
+package com.example.yappy.network
 
 import android.content.Context
 import android.util.Log
-import com.example.tefbanesco.storage.CryptoHelper
-import com.example.tefbanesco.storage.LocalStorage
+import com.example.yappy.storage.CryptoHelper
+import com.example.yappy.storage.LocalStorage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject

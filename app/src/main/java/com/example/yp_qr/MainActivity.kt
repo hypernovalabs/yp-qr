@@ -1,4 +1,4 @@
-package com.example.tefbanesco
+package com.example.yappy
 
 import android.app.Activity
 import android.content.Intent
@@ -9,8 +9,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.*
 import timber.log.Timber
 import timber.log.Timber.DebugTree
-import com.example.tefbanesco.intenthandlers.TransactionHandler
-import com.example.tefbanesco.network.ConfigManager
+import com.example.yappy.intenthandlers.TransactionHandler
+import com.example.yappy.network.ConfigManager
 
 class MainActivity : ComponentActivity() {
 

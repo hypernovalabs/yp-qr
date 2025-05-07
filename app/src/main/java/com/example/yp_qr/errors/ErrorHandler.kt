@@ -1,9 +1,9 @@
-package com.example.tefbanesco.errors
+package com.example.yappy.errors
 
 import android.app.Activity
 import android.content.Context
 import androidx.appcompat.view.ContextThemeWrapper
-import com.example.tefbanesco.R
+import com.example.yappy.R
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 object ErrorHandler {

@@ -1,4 +1,4 @@
-package com.example.tefbanesco.screens
+package com.example.yappy.screens
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -26,10 +26,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.tefbanesco.R
-import com.example.tefbanesco.network.ApiService
-import com.example.tefbanesco.storage.LocalStorage
-import com.example.tefbanesco.utils.buildTransactionStatusCurl
+import com.example.yappy.R
+import com.example.yappy.network.ApiService
+import com.example.yappy.storage.LocalStorage
+import com.example.yappy.utils.buildTransactionStatusCurl
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix

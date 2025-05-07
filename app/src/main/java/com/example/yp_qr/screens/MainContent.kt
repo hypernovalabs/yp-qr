@@ -1,4 +1,4 @@
-package com.example.tefbanesco
+package com.example.yappy
 
 import android.app.Activity
 import android.os.Bundle
@@ -9,13 +9,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.rememberNavController
-import com.example.tefbanesco.dialogs.ConfigDialog
-import com.example.tefbanesco.dialogs.LoadingDialog
-import com.example.tefbanesco.errors.ErrorHandler
-import com.example.tefbanesco.intenthandlers.TransactionHandler
-import com.example.tefbanesco.network.AppNavigationWithExtras
-import com.example.tefbanesco.screens.CancelResultScreen
-import com.example.tefbanesco.screens.SuccessResultScreen
+import com.example.yappy.dialogs.ConfigDialog
+import com.example.yappy.dialogs.LoadingDialog
+import com.example.yappy.errors.ErrorHandler
+import com.example.yappy.intenthandlers.TransactionHandler
+import com.example.yappy.network.AppNavigationWithExtras
+import com.example.yappy.screens.CancelResultScreen
+import com.example.yappy.screens.SuccessResultScreen
 import timber.log.Timber
 
 @Composable
@@ -39,7 +39,7 @@ fun MainContent(
     val navController = rememberNavController()
 
     LaunchedEffect(intentAction) {
-        if (intentAction == "icg.actions.electronicpayment.tefbanesco.TRANSACTION") {
+        if (intentAction == "icg.actions.electronicpayment.yappy.TRANSACTION") {
             Timber.d("🚀 Lanzando TransactionHandler.handle()")
             transactionHandler.handle()
         }

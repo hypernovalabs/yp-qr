@@ -1,4 +1,4 @@
-package com.example.tefbanesco.network
+package com.example.yappy.network
 
 import android.content.Context
 import android.util.Log

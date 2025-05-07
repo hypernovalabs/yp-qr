@@ -1,4 +1,4 @@
-package com.example.tefbanesco.network
+package com.example.yappy.network
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -7,9 +7,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.NavHostController
 import androidx.navigation.navArgument
-import com.example.tefbanesco.screens.MainScreen
-import com.example.tefbanesco.screens.QrResultScreen
-import com.example.tefbanesco.intenthandlers.TransactionHandler
+import com.example.yappy.screens.MainScreen
+import com.example.yappy.screens.QrResultScreen
+import com.example.yappy.intenthandlers.TransactionHandler
 
 @Composable
 fun AppNavigationWithExtras(

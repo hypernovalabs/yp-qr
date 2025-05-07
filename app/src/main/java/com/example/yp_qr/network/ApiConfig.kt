@@ -1,4 +1,4 @@
-package com.example.tefbanesco.network
+package com.example.yappy.network
 
 //    const val BASE_URL = "https://api-checkout.yappy.cloud/v1"
 // const val BASE_URL = " https://api-integrationcheckout-uat.yappycloud.com/v1"

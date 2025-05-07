@@ -1,4 +1,4 @@
-package com.example.tefbanesco.dialogs
+package com.example.yappy.dialogs
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*

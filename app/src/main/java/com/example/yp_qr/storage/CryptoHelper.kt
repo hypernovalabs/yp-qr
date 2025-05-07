@@ -1,4 +1,4 @@
-package com.example.tefbanesco.storage
+package com.example.yappy.storage
 
 import java.util.Base64
 import javax.crypto.Cipher

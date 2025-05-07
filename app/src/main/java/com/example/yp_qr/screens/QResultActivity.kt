@@ -1,4 +1,4 @@
-package com.example.tefbanesco.screens
+package com.example.yappy.screens
 
 import android.app.Activity // Necesario para RESULT_OK, RESULT_CANCELED
 import android.content.Intent // Necesario para el Intent de resultado
@@ -9,8 +9,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 // Quita el import de androidx.compose.ui.unit.dp si no se usa directamente aquí
 // import androidx.compose.ui.unit.dp
-import com.example.tefbanesco.storage.LocalStorage
-import com.example.tefbanesco.network.ApiService
+import com.example.yappy.storage.LocalStorage
+import com.example.yappy.network.ApiService
 // Los imports de las pantallas ya están bien
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -18,7 +18,7 @@ import org.json.JSONObject // Necesario para crear el TransactionData
 
 // CAMBIO: Definir constantes para los resultados y tipos de transacción
 object TefTransactionResults {
-    const val ACTION_TRANSACTION_RESULT = "icg.actions.electronicpayment.tefbanesco.TRANSACTION" // Reconfirmar si esta es la acción de RESPUESTA o si es solo el nombre del apk_name lo que se debe retornar
+    const val ACTION_TRANSACTION_RESULT = "icg.actions.electronicpayment.yappy.TRANSACTION" // Reconfirmar si esta es la acción de RESPUESTA o si es solo el nombre del apk_name lo que se debe retornar
 
     const val RESULT_ACCEPTED = "ACCEPTED"
     const val RESULT_FAILED = "FAILED"

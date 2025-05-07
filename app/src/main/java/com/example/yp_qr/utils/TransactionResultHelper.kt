@@ -1,9 +1,9 @@
 // File: app/src/main/java/com/example/yp_qr/utils/TransactionResultHelper.kt
-package com.example.tefbanesco.utils
+package com.example.yappy.utils
 
 import android.app.Activity
 import android.content.Intent
-import com.example.tefbanesco.screens.TefTransactionResults // Asegúrate que esta clase/objeto tenga las constantes
+import com.example.yappy.screens.TefTransactionResults // Asegúrate que esta clase/objeto tenga las constantes
 import org.json.JSONObject
 import timber.log.Timber
 
