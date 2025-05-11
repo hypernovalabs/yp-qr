@@ -27,6 +27,7 @@ data class PaymentIntentData(
  * Parsea un Intent de transacción y devuelve un objeto PaymentIntentData,
  * o null si no hay extras o ocurre un error.
  */
+
 fun parsePaymentIntent(intent: Intent): PaymentIntentData? {
     val bundle: Bundle? = intent.extras
     if (bundle == null) {

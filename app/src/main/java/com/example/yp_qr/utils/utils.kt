@@ -1,207 +1,185 @@
+// File: utils.kt
 package com.example.tefbanesco.utils
 
+import android.os.Bundle
+// No necesitamos JSONObject aquí si TransactionData es un string simple
+// import org.json.JSONObject
+import org.xmlpull.v1.XmlPullParser
+import org.xmlpull.v1.XmlPullParserFactory
+import timber.log.Timber
+import java.text.SimpleDateFormat
+import java.util.*
+
 /**
- * Clase para representar la información de un código de estado de tefbanesco.
+ * Construye una cadena para el campo TransactionData.
+ * Formato: "YAPPY_TRANSACTION_ID/LOCAL_ORDER_ID" o solo "YAPPY_TRANSACTION_ID".
+ * Truncada a 250 caracteres.
  *
- * @param code Código de estado (formato YP-XXXX)
- * @param name Nombre identificativo del código (según documentación)
- * @param description Descripción detallada del significado del código
- * @param isSuccess Indica si el código representa una operación exitosa
- * @param category Categoría a la que pertenece el código (puede haber solapamiento)
+ * @param yappyTransactionId El ID de la transacción de Yappy (opcional).
+ * @param localOrderId El ID de orden local (opcional).
+ * @return String formateada.
  */
-data class StatusCodeInfo(
-    val code: String,
-    val name: String, // Nombre exacto según la imagen/documentación
-    val description: String,
-    val isSuccess: Boolean = false,
-    val category: String
-)
+fun buildTransactionDataString(
+    yappyTransactionId: String?,
+    localOrderId: String?
+): String {
+    val parts = mutableListOf<String>()
+    yappyTransactionId?.takeIf { it.isNotBlank() }?.let { parts.add(it) }
+    localOrderId?.takeIf { it.isNotBlank() }?.let { parts.add(it) }
 
-/**
- * Clase que contiene todos los códigos de estado de la API tefbanesco
- * y funciones útiles para su gestión, basados en la documentación visual proporcionada.
- */
-object tefbanescoStatusCodes {
-    // Lista completa de todos los códigos según la imagen de referencia.
-    // NOTA: La estructura Map usa el 'code' como clave única. Códigos como YP-0000 y YP-0200
-    // aparecen en múltiples categorías en la imagen, pero aquí solo se puede almacenar una entrada.
-    // La función getInfo devolverá la primera definición encontrada (generalmente la de Sesión).
-    val CODES = mapOf(
-        // --- Servicios de sesión ---
-        "YP-0000" to StatusCodeInfo(
-            code = "YP-0000",
-            name = "SUCCESS", // También listado para Transacciones y QRs en la imagen
-            description = "Se ha realizado la ejecución del servicio correctamente",
-            isSuccess = true,
-            category = "Servicios de sesión"
-        ),
-        "YP-0006" to StatusCodeInfo(
-            code = "YP-0006",
-            name = "FAIL_OPEN",
-            description = "Error al Abrir la caja",
-            category = "Servicios de sesión"
-        ),
-        "YP-0200" to StatusCodeInfo(
-            code = "YP-0200",
-            name = "FAIL_VALIDATE_COMMERCE", // También listado para Transacciones en la imagen
-            description = "Error, ha ocurrido un error en procesar los datos. Contacte al administrador",
-            category = "Servicios de sesión"
-        ),
-        "YP-0401" to StatusCodeInfo(
-            code = "YP-0401",
-            name = "FAIL_DATA_ERROR", // Nombre idéntico a YP-0010 pero en diferente categoría
-            description = "Error al Abrir la caja", // Descripción diferente a YP-0010
-            category = "Servicios de sesión"
-        ),
-        "YP-0008" to StatusCodeInfo(
-            code = "YP-0008",
-            name = "FAIL_MISSED_HEADERS",
-            description = "Error, cabeceras obligatorias faltantes en la peticion",
-            category = "Servicios de sesión"
-        ),
-        "YP-0009" to StatusCodeInfo(
-            code = "YP-0009",
-            name = "FAIL_MISSED_DATA",
-            description = "Error, uno o mas campos obligatorios faltantes en el cuerpo de la peticion",
-            category = "Servicios de sesión"
-        ),
-        "YP-0021" to StatusCodeInfo(
-            code = "YP-0021",
-            name = "FAIL_OPEN_GENERAL_ERROR",
-            description = "Error en data: Hay un conflicto de datos",
-            category = "Servicios de sesión"
-        ),
+    return parts.joinToString("/").take(250)
+}
 
-        // --- Servicios de Transacciones ---
-        // YP-0000 y YP-0200 también aplican aquí según la imagen, pero el Map ya los tiene bajo Sesión.
+fun escapeXml(text: String): String {
+    return text.replace("&", "&")
+        .replace("<", "<")
+        .replace(">", ">")
+        .replace('\"', '"')
+        .replace("'", "'")
+}
 
-        "YP-0014" to StatusCodeInfo(
-            code = "YP-0014",
-            name = "FAIL_SETTLEMENT_TRANSACTION", // CORREGIDO: Settlement en lugar de Setlement
-            description = "Error, la reversa no puede ser procesada porque ya se liquido.",
-            category = "Servicios de Transacciones"
-        ),
-        "YP-0016" to StatusCodeInfo(
-            code = "YP-0016",
-            name = "FAIL_ALREADY_REVERSED_TRANSACTION",
-            description = "La transaccion que se intenta reversar posee un estado reversado",
-            category = "Servicios de Transacciones"
-        ),
-        "YP-0013" to StatusCodeInfo(
-            code = "YP-0013",
-            name = "FAIL_REVERSE_ERROR",
-            description = "Error, ha ocurrido un error en procesar los datos. Contacte al administrador",
-            category = "Servicios de Transacciones"
-        ),
-
-        // --- Servicios de QRs ---
-        // YP-0000 también aplica aquí según la imagen, pero el Map ya lo tiene bajo Sesión.
-
-        "YP-0010" to StatusCodeInfo(
-            code = "YP-0010",
-            name = "FAIL_DATA_ERROR", // Nombre idéntico a YP-0401 pero en diferente categoría
-            description = "Error, uno o mas campos del cuerpo de la peticion no cumplen con los valores enumerados", // Descripción diferente a YP-0401
-            category = "Servicios de QRs"
-        ),
-        "YP-0405" to StatusCodeInfo(
-            code = "YP-0405",
-            name = "AMOUNT_NOT_MATCH",
-            description = "El desglose de la transaccion no coincide con el total",
-            category = "Servicios de QRs"
-        ),
-
-        // --- Errores Generales de Plataforma (Comunes) ---
-        "YP-0002" to StatusCodeInfo(
-            code = "YP-0002",
-            name = "FAIL_ERROR",
-            description = "Error, ha ocurrido un error en procesar los datos. Contacte al administrador",
-            category = "Errores Generales de Plataforma"
-        ),
-        "YP-9999" to StatusCodeInfo(
-            code = "YP-9999",
-            name = "TIMEOUT_ERROR",
-            description = "Error, ha ocurrido un error en procesar los datos. Contacte al administrador",
-            category = "Errores Generales de Plataforma"
-        )
-    )
-
-    /**
-     * Obtiene la información detallada de un código de estado.
-     * Debido a la estructura Map, si un código existe en múltiples categorías (ej. YP-0000),
-     * devolverá la primera definición encontrada.
-     * Si el código no existe, devuelve información por defecto.
-     *
-     * @param code Código a buscar (formato YP-XXXX)
-     * @return StatusCodeInfo con la información del código encontrado o uno por defecto.
-     */
-    fun getInfo(code: String): StatusCodeInfo {
-        return CODES[code] ?: StatusCodeInfo(
-            code = code,
-            name = "UNKNOWN",
-            description = "Código de estado desconocido: $code",
-            category = "Desconocido"
-        )
+fun parseShopData(xmlString: String?): Map<String, String> {
+    val data = mutableMapOf<String, String>()
+    if (xmlString.isNullOrBlank()) {
+        Timber.w("parseShopData: XML de ShopData es nulo o vacío.")
+        return data
     }
+    try {
+        Timber.d("parseShopData: Parseando XML de ShopData: ${xmlString.take(150)}...")
+        val factory = XmlPullParserFactory.newInstance().apply { isNamespaceAware = false }
+        val parser = factory.newPullParser().apply { setInput(xmlString.reader()) }
 
-    /**
-     * Indica si un código representa una operación exitosa (basado en la definición encontrada).
-     *
-     * @param code Código a verificar
-     * @return true si el código indica éxito, false en caso contrario
-     */
-    fun isSuccess(code: String): Boolean {
-        // Devuelve true solo si isSuccess está explícitamente marcado como true en la definición encontrada.
-        return CODES[code]?.isSuccess ?: false // Más seguro devolver false si no se encuentra o no está definido
-    }
+        var eventType = parser.eventType
+        var currentTagName: String? = null
 
-    /**
-     * Constantes y utilidades relacionadas con los *estados del ciclo de vida* de una transacción.
-     * Estos no son los códigos de respuesta de la API mostrados en la imagen.
-     */
-    object TransactionStatus {
-        const val PENDING = "PENDING"
-        const val COMPLETADA = "COMPLETADA" // Corresponde a un estado final exitoso
-        const val CANCELADA = "CANCELADA" // Corresponde a un estado final no exitoso
-        const val FALLIDA = "FALLIDA"     // Corresponde a un estado final no exitoso
-        const val REVERSADA = "REVERSADA" // Corresponde a un estado final no exitoso (anulación)
-        const val LIQUIDADA = "LIQUIDADA" // Corresponde a un estado final procesado (post-completada)
-        const val DESCONOCIDO = "DESCONOCIDO"
-
-        /**
-         * Verifica si un estado de transacción es considerado un estado final
-         * (es decir, la transacción no cambiará más de estado).
-         *
-         * @param status Estado a verificar
-         * @return true si es un estado final, false en caso contrario
-         */
-        fun isFinalState(status: String): Boolean {
-            // Se compara ignorando mayúsculas/minúsculas para robustez
-            return status.equals(COMPLETADA, ignoreCase = true) ||
-                    status.equals(CANCELADA, ignoreCase = true) ||
-                    status.equals(FALLIDA, ignoreCase = true) ||
-                    status.equals(REVERSADA, ignoreCase = true) ||
-                    status.equals(LIQUIDADA, ignoreCase = true)
+        while (eventType != XmlPullParser.END_DOCUMENT) {
+            when (eventType) {
+                XmlPullParser.START_TAG -> {
+                    currentTagName = parser.name
+                }
+                XmlPullParser.TEXT -> {
+                    val textValue = parser.text?.trim()
+                    if (currentTagName != null && !textValue.isNullOrBlank()) {
+                        val key = if (currentTagName == "cityWithPostalCode") "city" else currentTagName
+                        data[key] = textValue
+                    }
+                }
+                XmlPullParser.END_TAG -> {
+                    currentTagName = null
+                }
+            }
+            eventType = parser.next()
         }
+        Timber.d("parseShopData: Parseo de ShopData completado: $data")
+    } catch (e: Exception) {
+        Timber.e(e, "parseShopData: Error parseando XML de ShopData.")
+    }
+    return data
+}
 
-        /**
-         * Obtiene una descripción amigable de un estado de transacción para mostrar al usuario.
-         *
-         * @param status Estado a describir
-         * @return Descripción amigable del estado
-         */
-        fun getDescription(status: String): String {
-            // Se usa uppercase() para asegurar la comparación correcta en el when
-            return when (status.uppercase()) {
-                PENDING -> "En proceso"
-                COMPLETADA -> "Completada"
-                CANCELADA -> "Cancelada"
-                FALLIDA -> "Fallida"
-                REVERSADA -> "Reversada"
-                LIQUIDADA -> "Liquidada"
-                // Se incluye DESCONOCIDO explícitamente para claridad
-                DESCONOCIDO -> "Estado desconocido"
-                else -> "Estado desconocido ($status)" // Devuelve el estado original si no coincide
+fun mapCurrencyISOToSymbol(isoCode: String?): String {
+    if (isoCode.isNullOrBlank()) return ""
+    val alphaISO = when (isoCode) {
+        "840" -> "USD"
+        "590" -> "PAB"
+        else -> isoCode.uppercase(Locale.getDefault())
+    }
+    return when (alphaISO) {
+        "USD" -> "$"
+        "PAB" -> "B/."
+        else -> alphaISO
+    }
+}
+
+fun formatIsoDate(isoDateTimeString: String?, outputPattern: String): String {
+    if (isoDateTimeString.isNullOrBlank()) return "N/A"
+    return try {
+        val parsers = listOf(
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US),
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
+        )
+        var date: Date? = null
+        for (parser in parsers) {
+            parser.timeZone = TimeZone.getTimeZone("UTC")
+            try {
+                date = parser.parse(isoDateTimeString)
+                if (date != null) break
+            } catch (_: Exception) {
             }
         }
+
+        if (date != null) {
+            val outputFormat = SimpleDateFormat(outputPattern, Locale.getDefault())
+            outputFormat.format(date)
+        } else {
+            Timber.w("formatIsoDate: No se pudo parsear la fecha ISO: $isoDateTimeString con los formatos conocidos.")
+            isoDateTimeString
+        }
+    } catch (e: Exception) {
+        Timber.e(e, "formatIsoDate: Error formateando fecha ISO: $isoDateTimeString")
+        isoDateTimeString
+    }
+}
+
+fun bundleExtrasToString(bundle: Bundle?): String {
+    if (bundle == null) return "Bundle[null]"
+    if (bundle.isEmpty) return "Bundle[empty]"
+    return bundle.keySet().joinToString(prefix = "Bundle[", postfix = "]") { key ->
+        "$key=${bundle.get(key)}"
+    }
+}
+
+// Necesitarás añadir PaymentIntentData aquí o importarla si está en otro archivo de utils
+// Para mantenerlo autocontenido por ahora, lo pongo aquí. Si ya lo tienes en PaymentIntentParser.kt en el mismo paquete, esta duplicación no es necesaria.
+data class PaymentIntentData(
+    val currencyISO: String?,
+    val tenderType: String?,
+    val authorizationId: String?,
+    val tipAmount: Double,
+    val shopDataXml: String?,
+    val receiptPrinterColumns: Int,
+    val externalTransactionData: String?, // Este es el TransactionData de ENTRADA de HioPOS
+    val transactionType: String?,
+    val languageISO: String?,
+    val taxAmount: Double,
+    val taxDetailXml: String?,
+    val posTransactionId: Int,
+    val totalAmount: Double,
+    val originalIntentAction: String? // << NUEVO: Para pasar la action original
+)
+
+fun parsePaymentIntent(intent: Intent): PaymentIntentData? {
+    val bundle: Bundle? = intent.extras
+    if (bundle == null) {
+        Timber.w("El Intent no contiene extras. No se pueden parsear los datos de la transacción.")
+        return null
+    }
+
+    return try {
+        val amountRaw    = bundle.getString("Amount", "0")?.toDoubleOrNull() ?: 0.0
+        val tipRaw       = bundle.getString("TipAmount", "0")?.toDoubleOrNull() ?: 0.0
+        val taxRaw       = bundle.getString("TaxAmount", "0")?.toDoubleOrNull() ?: 0.0
+
+        PaymentIntentData(
+            currencyISO             = bundle.getString("CurrencyISO"),
+            tenderType              = bundle.getString("TenderType"),
+            authorizationId         = bundle.getString("AuthorizationId")?.takeIf { it.isNotBlank() },
+            tipAmount               = tipRaw / 100.0,
+            shopDataXml             = bundle.getString("ShopData"),
+            receiptPrinterColumns   = bundle.getInt("ReceiptPrinterColumns", 42), // Default a 42 si no viene
+            externalTransactionData = bundle.getString("TransactionData")?.takeIf { it.isNotBlank() },
+            transactionType         = bundle.getString("TransactionType"),
+            languageISO             = bundle.getString("LanguageISO"),
+            taxAmount               = taxRaw / 100.0,
+            taxDetailXml            = bundle.getString("TaxDetail"),
+            posTransactionId        = bundle.getInt("TransactionId", 0),
+            totalAmount             = amountRaw / 100.0,
+            originalIntentAction    = intent.action // << NUEVO: Guardar la action original
+        ).also {
+            Timber.i("Datos del Intent de pago parseados (incluyendo action original): $it")
+        }
+    } catch (e: Exception) {
+        Timber.e(e, "Error al parsear los datos del Intent de pago.")
+        null
     }
 }
