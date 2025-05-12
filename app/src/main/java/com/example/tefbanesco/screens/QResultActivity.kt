@@ -182,7 +182,7 @@ class QrResultActivity : ComponentActivity() {
         resultIntent.putExtra("AuthorizationId", yappyTransactionId)
         resultIntent.putExtra("CardHolder", "Cliente Yappy")
         resultIntent.putExtra("CardType", "Yappy")
-        resultIntent.putExtra("CardNum", "********${localOrderId.takeLast(4)}")
+        resultIntent.putExtra("CardNum", "4224224242${localOrderId.takeLast(4)}")
 
         if (result == TefTransactionResults.RESULT_FAILED && errorMessage != null) {
             resultIntent.putExtra("ErrorMessage", errorMessage)
