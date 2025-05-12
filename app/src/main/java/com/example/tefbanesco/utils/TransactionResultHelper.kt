@@ -58,6 +58,24 @@ object TransactionResultHelper {
             putExtra("Amount", decimalFmt.format(pd.amount).replace(".", ""))
             putExtra("TipAmount", decimalFmt.format(pd.tipAmount).replace(".", ""))
             putExtra("TaxAmount", decimalFmt.format(pd.taxAmount).replace(".", ""))
+
+            // API v3.5: Pasar el DocumentPath si existe (prioridad sobre DocumentData)
+            pd.documentPath?.let {
+                putExtra("DocumentPath", it)
+                Timber.d("[YAPPY] Usando DocumentPath: $it")
+            }
+
+            // Si hay OverPaymentType, pasarlo como información útil
+            if (pd.overPaymentType != -1) {
+                putExtra("OverPaymentTypeOriginal", pd.overPaymentType)
+                Timber.d("[YAPPY] OverPaymentType recibido: ${pd.overPaymentType}")
+            }
+
+            // Si es un pago avanzado, registrar
+            if (pd.isAdvancedPayment) {
+                putExtra("IsAdvancedPaymentOriginal", true)
+                Timber.d("[YAPPY] Pago avanzado: true")
+            }
         }
     }
 }

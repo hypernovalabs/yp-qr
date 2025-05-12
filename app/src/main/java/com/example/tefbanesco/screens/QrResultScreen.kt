@@ -78,37 +78,100 @@ fun QrResultScreen(
 
     val isCheckingStatus = currentStatus == "PENDING" && !isCancelling
 
-    // Polling transaction status
+    // Polling transaction status with improved error handling and retry limits
     LaunchedEffect(transactionId, token, apiKey, secretKey) {
+        var retryCount = 0
+        val maxRetries = 12 // 12 retries × 5 seconds = 1 minute maximum polling time
+        var pollInterval = 5_000L // Start with 5 seconds
+        var consecutiveErrors = 0
+
         while (true) {
+            // Break if cancelling or max retries reached
             if (isCancelling) break
+            if (retryCount >= maxRetries) {
+                currentStatus = "MAX_RETRIES_REACHED"
+                Timber.w("[YAPPY] Max polling retries reached for transaction $transactionId")
+                break
+            }
+
+            // Check credentials
             if (token.isBlank() || apiKey.isBlank() || secretKey.isBlank()) {
                 rawApiResponse = "Error: missing credentials for polling"
-                currentStatus  = "ERROR_CONFIG"
+                currentStatus = "ERROR_CONFIG"
+                Timber.e("[YAPPY] Missing credentials for polling transaction status")
                 delay(10_000) // Wait longer on config error
+                retryCount++
                 continue
             }
 
             try {
+                Timber.d("[YAPPY] Polling status for transaction $transactionId (attempt ${retryCount+1}/$maxRetries)")
                 val response = ApiService.getTransactionStatus(
                     transactionId, token, apiKey, secretKey
                 )
                 rawApiResponse = response // Keep for debugging
-                val json       = JSONObject(response)
+                val json = JSONObject(response)
                 val statusBody = json.optJSONObject("body")
                     ?.optString("status")
-                currentStatus  = statusBody.takeUnless { it.isNullOrBlank() }
+
+                // Get status from response
+                currentStatus = statusBody.takeUnless { it.isNullOrBlank() }
                     ?: json.optString("code", currentStatus) // Fallback to code if body status is null/blank
 
+                Timber.d("[YAPPY] Transaction status: $currentStatus")
+
+                // Reset error counter on successful API call
+                consecutiveErrors = 0
+
+                // Check for terminal states
                 when (currentStatus.uppercase(Locale.US)) {
-                    "COMPLETED"  -> { onPaymentSuccess(); break }
-                    "CANCELLED", "FAILED", "EXPIRED" -> { onCancelSuccess(); break }
+                    "COMPLETED" -> {
+                        Timber.i("[YAPPY] Transaction COMPLETED. Calling onPaymentSuccess()")
+                        onPaymentSuccess()
+                        break
+                    }
+                    "CANCELLED", "FAILED", "EXPIRED" -> {
+                        Timber.i("[YAPPY] Transaction $currentStatus. Calling onCancelSuccess()")
+                        onCancelSuccess()
+                        break
+                    }
                 }
             } catch (e: Exception) {
+                // Increment error counter
+                consecutiveErrors++
+
+                // Categorize errors for better feedback
+                val errorMsg = when {
+                    e is java.net.UnknownHostException ||
+                    e is java.net.ConnectException -> {
+                        "NETWORK_ERROR"
+                    }
+                    e is java.net.SocketTimeoutException -> {
+                        "TIMEOUT_ERROR"
+                    }
+                    e.message?.contains("401", true) == true -> {
+                        "AUTH_ERROR"
+                    }
+                    e.message?.contains("500", true) == true -> {
+                        "SERVER_ERROR"
+                    }
+                    else -> "POLLING_ERROR"
+                }
+
                 rawApiResponse = "Polling error: ${e.localizedMessage}"
-                currentStatus  = "POLLING_EXCEPTION"
+                currentStatus = errorMsg
+
+                Timber.e(e, "[YAPPY] Error polling transaction status: $errorMsg")
+
+                // Implement exponential backoff for network errors
+                if (consecutiveErrors > 1) {
+                    pollInterval = (pollInterval * 1.5).toLong().coerceAtMost(15_000L) // Max 15 seconds
+                    Timber.d("[YAPPY] Increasing poll interval to $pollInterval ms after $consecutiveErrors consecutive errors")
+                }
             }
-            delay(5_000) // Poll every 5 seconds
+
+            retryCount++
+            delay(pollInterval)
         }
     }
 
@@ -154,26 +217,79 @@ fun QrResultScreen(
                 modifier  = Modifier.fillMaxWidth()
             )
 
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text      = "Estado actual: $currentStatus",
-                fontSize  = 14.sp,
-                color     = ComposeColor.White,
-                textAlign = TextAlign.Center,
-                modifier  = Modifier.fillMaxWidth()
-            )
+            Spacer(Modifier.height(16.dp))
+
+            // Status display with human-readable messages and color indicators
+            val (statusMessage, statusColor) = when (currentStatus.uppercase(Locale.US)) {
+                "PENDING" -> "Esperando pago..." to ComposeColor.White
+                "COMPLETED" -> "¡Pago Completado!" to ComposeColor(0xFF4CAF50) // Green
+                "CANCELLED" -> "Pago Cancelado" to ErrorColor
+                "FAILED" -> "Pago Fallido" to ErrorColor
+                "EXPIRED" -> "Pago Expirado" to ErrorColor
+                "NETWORK_ERROR" -> "Error de Conexión" to ErrorColor
+                "TIMEOUT_ERROR" -> "Tiempo de Espera Agotado" to ErrorColor
+                "AUTH_ERROR" -> "Error de Autenticación" to ErrorColor
+                "SERVER_ERROR" -> "Error del Servidor" to ErrorColor
+                "ERROR_CONFIG" -> "Error de Configuración" to ErrorColor
+                "MAX_RETRIES_REACHED" -> "Tiempo de Espera Agotado" to ErrorColor
+                else -> "Estado: $currentStatus" to ComposeColor.White
+            }
+
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = statusColor.copy(alpha = 0.2f)
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp)
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp, horizontal = 16.dp)
+                ) {
+                    Text(
+                        text = statusMessage,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = statusColor,
+                        textAlign = TextAlign.Center
+                    )
+
+                    // Show additional help text based on status
+                    if (currentStatus.uppercase(Locale.US) == "PENDING") {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = "Abre la app de Yappy y escanea el código QR",
+                            fontSize = 14.sp,
+                            color = ComposeColor.White,
+                            textAlign = TextAlign.Center
+                        )
+                    } else if (currentStatus.contains("ERROR", true)) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = "Intenta de nuevo o contacta a soporte",
+                            fontSize = 14.sp,
+                            color = ComposeColor.White,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
 
             if (isCheckingStatus) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(16.dp))
                 Row(
-                    verticalAlignment   = Alignment.CenterVertically,
-                    horizontalArrangement= Arrangement.Center,
-                    modifier            = Modifier.fillMaxWidth()
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     CircularProgressIndicator(
-                        strokeWidth=2.dp,
-                        modifier   = Modifier.size(20.dp),
-                        color      = ComposeColor.White
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(20.dp),
+                        color = ComposeColor.White
                     )
                     Spacer(Modifier.width(8.dp))
                     Text("Verificando estado...", color = ComposeColor.White, fontSize = 14.sp)
@@ -181,33 +297,80 @@ fun QrResultScreen(
             }
 
             Spacer(Modifier.height(32.dp))
-            // Cancel button
+            // Cancel button with improved error handling
             Button(
                 onClick = {
                     coroutineScope.launch {
                         if (currentStatus.uppercase(Locale.US) != "PENDING") return@launch // Only allow cancelling PENDING
                         isCancelling = true
+                        cancelError = null // Reset any previous error
+
                         try {
+                            Timber.d("[YAPPY] Attempting to cancel transaction $transactionId")
                             val result = ApiService.cancelTransaction(
                                 transactionId, token, apiKey, secretKey
                             )
                             rawApiResponse = result // Keep for debugging
-                            val cancelled = JSONObject(result)
-                                .optJSONObject("body")
-                                ?.optString("status")
-                                .equals("CANCELLED", true)
-                            if (cancelled) onCancelSuccess() else cancelError = "Error al cancelar"
+
+                            // Parse the response
+                            val json = JSONObject(result)
+                            val bodyObj = json.optJSONObject("body")
+                            val status = bodyObj?.optString("status")
+                            val code = json.optString("code", "")
+
+                            when {
+                                status.equals("CANCELLED", true) -> {
+                                    Timber.i("[YAPPY] Transaction successfully cancelled")
+                                    onCancelSuccess()
+                                }
+                                code.equals("YP-0000", true) && status.isNullOrBlank() -> {
+                                    // Status returned null but code is success
+                                    Timber.i("[YAPPY] Transaction likely cancelled (success code but no status)")
+                                    onCancelSuccess()
+                                }
+                                code.startsWith("YP-", true) -> {
+                                    // Error code from Yappy
+                                    val message = json.optString("message", "Error al cancelar")
+                                    cancelError = "Error Yappy: $message"
+                                    Timber.w("[YAPPY] Cancellation error: $code - $message")
+                                }
+                                status.equals("COMPLETED", true) -> {
+                                    // Can't cancel a completed transaction
+                                    cancelError = "No se puede cancelar: transacción ya completada"
+                                    Timber.w("[YAPPY] Can't cancel: transaction already COMPLETED")
+
+                                    // Since it's completed, notify success
+                                    onPaymentSuccess()
+                                }
+                                else -> {
+                                    // Unknown error
+                                    cancelError = "Error desconocido al cancelar"
+                                    Timber.w("[YAPPY] Unknown cancel error. Code: $code, Status: $status")
+                                }
+                            }
                         } catch (e: Exception) {
-                            cancelError    = "Excepción: ${e.localizedMessage}"
-                            rawApiResponse = cancelError // Keep for debugging
+                            // Categorize errors for better messages
+                            cancelError = when {
+                                e is java.net.UnknownHostException ||
+                                e is java.net.ConnectException ->
+                                    "Error de conexión al intentar cancelar"
+                                e is java.net.SocketTimeoutException ->
+                                    "Tiempo de espera agotado al cancelar"
+                                e.message?.contains("401", true) == true ->
+                                    "Error de autenticación al cancelar"
+                                else -> "Error al cancelar: ${e.message}"
+                            }
+
+                            rawApiResponse = "Cancel error: ${e.localizedMessage}"
+                            Timber.e(e, "[YAPPY] Exception while cancelling transaction: $cancelError")
                         } finally {
                             isCancelling = false
                         }
                     }
                 },
                 enabled = !isCancelling && currentStatus.uppercase(Locale.US) == "PENDING", // Only enabled if not cancelling and status is PENDING
-                colors  = ButtonDefaults.buttonColors(containerColor = ComposeColor.White),
-                modifier= Modifier
+                colors = ButtonDefaults.buttonColors(containerColor = ComposeColor.White),
+                modifier = Modifier
                     .padding(horizontal = 32.dp)
                     .fillMaxWidth() // Make button fill width
                     .height(48.dp)

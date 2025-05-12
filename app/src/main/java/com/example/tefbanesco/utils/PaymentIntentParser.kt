@@ -7,6 +7,7 @@ import kotlin.concurrent.timer
 
 /**
  * Claves de los extras que entrega HioPos en el Intent de transacción.
+ * Actualizado según la API v3.5 (21 de Enero de 2025)
  */
 object HioPosIntentKeys {
     const val CURRENCY_ISO = "CurrencyISO"
@@ -23,6 +24,9 @@ object HioPosIntentKeys {
     const val SHOP_DATA = "ShopData"
     const val SELLER_DATA = "SellerData"
     const val DOCUMENT_DATA = "DocumentData"
+    const val DOCUMENT_PATH = "DocumentPath"
+    const val OVER_PAYMENT_TYPE = "OverPaymentType"
+    const val IS_ADVANCED_PAYMENT = "IsAdvancedPayment"
 }
 
 /**
@@ -41,6 +45,7 @@ fun Bundle.extrasToReadableString(): String {
 
 /**
  * Data class para mantener los datos extraídos del Intent.
+ * Actualizado según la API v3.5 (21 de Enero de 2025)
  */
 data class PaymentIntentData(
     val currencyIso: String,
@@ -56,7 +61,10 @@ data class PaymentIntentData(
     val receiptPrinterColumns: Int,
     val shopData: String?,
     val sellerData: String?,
-    val documentData: String?
+    val documentData: String?,
+    val documentPath: String?,
+    val overPaymentType: Int,
+    val isAdvancedPayment: Boolean
 )
 
 /**
@@ -133,6 +141,11 @@ fun parsePaymentIntent(intent: Intent): PaymentIntentData? {
         val sellerData         = bundle.getString(HioPosIntentKeys.SELLER_DATA)
         val documentData       = bundle.getString(HioPosIntentKeys.DOCUMENT_DATA)
 
+        // Campos nuevos de la API v3.5
+        val documentPath       = bundle.getString(HioPosIntentKeys.DOCUMENT_PATH)
+        val overPaymentType    = bundle.getInt(HioPosIntentKeys.OVER_PAYMENT_TYPE, -1)
+        val isAdvancedPayment  = bundle.getBoolean(HioPosIntentKeys.IS_ADVANCED_PAYMENT, false)
+
         PaymentIntentData(
             currencyIso           = currencyIso,
             tenderType            = tenderType,
@@ -147,9 +160,17 @@ fun parsePaymentIntent(intent: Intent): PaymentIntentData? {
             receiptPrinterColumns = printerColumns,
             shopData              = shopData,
             sellerData            = sellerData,
-            documentData          = documentData
+            documentData          = documentData,
+            documentPath          = documentPath,
+            overPaymentType       = overPaymentType,
+            isAdvancedPayment     = isAdvancedPayment
         ).also {
-            Timber.i("Datos del Intent de pago parseados: $it")
+            Timber.i("[YAPPY] Datos del Intent de pago parseados: $it")
+
+            // Logging especial para documentPath (importante para API v3.5)
+            if (documentPath != null) {
+                Timber.d("[YAPPY] HioPos envió DocumentPath: $documentPath")
+            }
         }
     } catch (e: Exception) {
         Timber.e(e, "Error al parsear los datos del Intent de pago.")

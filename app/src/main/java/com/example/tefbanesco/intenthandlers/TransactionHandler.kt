@@ -47,7 +47,7 @@ class TransactionHandler(
 
         currentPaymentData = parsePaymentIntent(activity.intent)
         if (currentPaymentData == null) {
-            Timber.e("❌ Fallo al parsear datos del Intent inicial.")
+            Timber.e("[YAPPY] Fallo al parsear datos del Intent inicial.")
             finishWithFailureEarly(
                 activity,
                 currentPaymentData,
@@ -56,6 +56,10 @@ class TransactionHandler(
             return
         }
         val pd = currentPaymentData!!
+
+        // API v3.5: Priorizar DocumentPath si existe y hay banderas que lo indican
+        processDocumentPathIfNeeded(pd)
+
         originalHioPosTransactionId = pd.transactionId  // guardamos el ID original como String
 
         if (!ApiConfig.isBaseUrlConfigured()) {
@@ -216,7 +220,112 @@ class TransactionHandler(
 
     private fun logIntentExtras(intent: Intent) {
         intent.extras?.keySet()?.forEach { key ->
-            Timber.d("Intent Extra > $key=${intent.extras?.get(key)}")
+            Timber.d("[YAPPY] Intent Extra > $key=${intent.extras?.get(key)}")
         }
+    }
+
+    /**
+     * API v3.5: Procesa DocumentPath si existe y debería tener prioridad sobre DocumentData
+     * según las configuraciones de comportamiento de HioPos.
+     */
+    private fun processDocumentPathIfNeeded(pd: PaymentIntentData) {
+        // Verificar si tenemos DocumentPath y si debemos usarlo
+        if (pd.documentPath != null && shouldUseDocumentPath()) {
+            Timber.d("[YAPPY] DocumentPath encontrado: ${pd.documentPath}")
+
+            try {
+                // Leer el contenido del archivo XML
+                val file = java.io.File(pd.documentPath)
+                if (!file.exists() || !file.canRead()) {
+                    Timber.w("[YAPPY] No se puede acceder al archivo en DocumentPath: ${pd.documentPath}")
+                    return
+                }
+
+                val documentContent = file.readText()
+
+                // Si el contenido está vacío, no hacer nada
+                if (documentContent.isBlank()) {
+                    Timber.w("[YAPPY] El archivo en DocumentPath está vacío: ${pd.documentPath}")
+                    return
+                }
+
+                Timber.d("[YAPPY] Documento leído desde DocumentPath, ${documentContent.length} bytes")
+
+                // Parsear el XML y extraer la información relevante
+                // Este es un ejemplo simplificado. En una implementación completa,
+                // deberías usar un parser XML adecuado como ya haces en otros lugares.
+                val documentInfo = parseDocumentXml(documentContent)
+
+                // Aquí puedes actualizar pd o usar documentInfo directamente en tu lógica
+                // Por ejemplo, podrías extraer monto, impuestos, etc.
+
+                Timber.i("[YAPPY] DocumentPath procesado correctamente. Priorizando sobre DocumentData.")
+            } catch (e: Exception) {
+                Timber.e(e, "[YAPPY] Error al procesar DocumentPath: ${pd.documentPath}")
+                // Si hay error al leer DocumentPath, podemos caer back a DocumentData
+            }
+        }
+    }
+
+    /**
+     * Parsea el contenido XML del documento.
+     * Esta es una implementación simplificada, deberías adaptarla a la estructura
+     * específica del XML que HioPos envía en DocumentData/DocumentPath.
+     */
+    private fun parseDocumentXml(xmlContent: String): Map<String, String> {
+        val result = mutableMapOf<String, String>()
+
+        try {
+            val factory = org.xmlpull.v1.XmlPullParserFactory.newInstance()
+            factory.isNamespaceAware = false
+            val parser = factory.newPullParser()
+            parser.setInput(xmlContent.reader())
+
+            var eventType = parser.eventType
+            var currentTag: String? = null
+
+            while (eventType != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
+                when (eventType) {
+                    org.xmlpull.v1.XmlPullParser.START_TAG -> {
+                        currentTag = parser.name
+                    }
+                    org.xmlpull.v1.XmlPullParser.TEXT -> {
+                        val text = parser.text.trim()
+                        if (currentTag != null && text.isNotEmpty()) {
+                            result[currentTag] = text
+                        }
+                    }
+                    org.xmlpull.v1.XmlPullParser.END_TAG -> {
+                        currentTag = null
+                    }
+                }
+                eventType = parser.next()
+            }
+
+            Timber.d("[YAPPY] Documento XML parseado, ${result.size} campos encontrados")
+        } catch (e: Exception) {
+            Timber.e(e, "[YAPPY] Error parseando XML del documento")
+        }
+
+        return result
+    }
+
+    /**
+     * Determina si se debe usar DocumentPath en lugar de DocumentData.
+     * Este valor debería obtenerse de la respuesta de GET_BEHAVIOR.
+     */
+    private fun shouldUseDocumentPath(): Boolean {
+        // Implementación real:
+        // 1. Obtener el valor de OnlyUseDocumentPath del SharedPreferences donde lo guardaste
+        //    después de que HioPos llamó a GET_BEHAVIOR
+
+        // Por ejemplo:
+        val prefs = activity.getSharedPreferences("HioPosBehaviorPrefs", Context.MODE_PRIVATE)
+        val onlyUseDocumentPath = prefs.getBoolean("OnlyUseDocumentPath", false)
+
+        // También podrías guardarlo en LocalStorage si ya lo tienes configurado para esto
+
+        // Por ahora, devolvemos false hasta que implementes la persistencia completa
+        return onlyUseDocumentPath
     }
 }

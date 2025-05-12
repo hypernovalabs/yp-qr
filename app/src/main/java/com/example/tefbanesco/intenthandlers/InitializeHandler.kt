@@ -6,9 +6,15 @@ import com.example.tefbanesco.storage.LocalStorage
 import com.example.tefbanesco.errors.ErrorHandler // ✅ Importamos ErrorHandler
 import kotlinx.coroutines.runBlocking
 import org.xmlpull.v1.XmlPullParserFactory
+import timber.log.Timber
 
 class InitializeHandler(private val activity: Activity) {
 
+    /**
+     * Maneja el intent INITIALIZE directamente (para uso con BroadcastReceiver)
+     * Esta función se mantiene por compatibilidad, pero se recomienda usar processParameters()
+     * con InitializeActivity.
+     */
     fun handle() {
         val parametersXml = activity.intent.getStringExtra("Parameters")
 
@@ -44,6 +50,47 @@ class InitializeHandler(private val activity: Activity) {
 
         } catch (e: Exception) {
             fail("Error al parsear configuración: ${e.message}")
+        }
+    }
+
+    /**
+     * Procesa los parámetros de inicialización recibidos de HioPos.
+     * Este método es utilizado por InitializeActivity.
+     *
+     * @return true si los parámetros se procesaron correctamente, false en caso contrario
+     */
+    fun processParameters(): Boolean {
+        val parametersXml = activity.intent.getStringExtra("Parameters")
+
+        // Verificar si hay parámetros
+        if (parametersXml.isNullOrBlank()) {
+            Timber.w("[YAPPY] No se recibieron parámetros de inicialización")
+            return false
+        }
+
+        return try {
+            // Parsear XML y guardar configuración
+            val configMap = parseXml(parametersXml)
+            Timber.d("[YAPPY] Parámetros recibidos: ${configMap.keys}")
+
+            runBlocking {
+                LocalStorage.saveConfig(
+                    context = activity,
+                    endpoint = configMap["endpoint"] ?: "",
+                    apiKey = configMap["api_key"] ?: "",
+                    secretKey = configMap["secret_key"] ?: "",
+                    deviceId = configMap["device_id"] ?: "",
+                    deviceName = configMap["device_name"] ?: "",
+                    deviceUser = configMap["device_user"] ?: "",
+                    groupId = configMap["group_id"] ?: ""
+                )
+            }
+
+            Timber.i("[YAPPY] Parámetros procesados y guardados correctamente")
+            true
+        } catch (e: Exception) {
+            Timber.e(e, "[YAPPY] Error procesando parámetros de inicialización")
+            false
         }
     }
 

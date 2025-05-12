@@ -46,20 +46,79 @@
             android:theme="@style/Theme.Ypqr"
             android:label="QR Result" />
 
-        <!-- ✅ Receiver silencioso para otros intents -->
-        <receiver
-            android:name=".receivers.TefReceiver"
+        <!-- ✅ Activities para los intents requeridos por HioPos v3.5 -->
+
+        <!-- Activity para inicialización del módulo (INITIALIZE) -->
+        <activity
+            android:name=".activities.InitializeActivity"
             android:exported="true"
-            android:enabled="true">
+            android:theme="@style/Theme.Ypqr"
+            android:label="Initialize">
             <intent-filter>
                 <action android:name="icg.actions.electronicpayment.none.INITIALIZE" />
-                <action android:name="icg.actions.electronicpayment.tefbanesco.SHOW_SETUP_SCREEN" />
-                <action android:name="icg.actions.electronicpayment.tefbanesco.FINALIZE" />
-                <action android:name="icg.actions.electronicpayment.tefbanesco.GET_VERSION" />
-                <action android:name="icg.actions.electronicpayment.tefbanesco.GET_BEHAVIOR" />
-                <action android:name="icg.actions.electronicpayment.tefbanesco.GET_CUSTOM_PARAMS" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
-        </receiver>
+        </activity>
+
+        <!-- Activity para pantalla de configuración (SHOW_SETUP_SCREEN) -->
+        <activity
+            android:name=".activities.ShowSetupActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Ypqr"
+            android:label="Setup">
+            <intent-filter>
+                <action android:name="icg.actions.electronicpayment.tefbanesco.SHOW_SETUP_SCREEN" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Activity para finalizar/liberar recursos (FINALIZE) -->
+        <activity
+            android:name=".activities.FinalizeActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Ypqr"
+            android:label="Finalize">
+            <intent-filter>
+                <action android:name="icg.actions.electronicpayment.tefbanesco.FINALIZE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Activity para informar versión (GET_VERSION) -->
+        <activity
+            android:name=".activities.GetVersionActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Ypqr"
+            android:label="Get Version">
+            <intent-filter>
+                <action android:name="icg.actions.electronicpayment.tefbanesco.GET_VERSION" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Activity para comportamiento del módulo (GET_BEHAVIOR) -->
+        <activity
+            android:name=".activities.GetBehaviorActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Ypqr"
+            android:label="Get Behavior">
+            <intent-filter>
+                <action android:name="icg.actions.electronicpayment.tefbanesco.GET_BEHAVIOR" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Activity para parámetros personalizados (GET_CUSTOM_PARAMS) -->
+        <activity
+            android:name=".activities.GetCustomParamsActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Ypqr"
+            android:label="Get Custom Params">
+            <intent-filter>
+                <action android:name="icg.actions.electronicpayment.tefbanesco.GET_CUSTOM_PARAMS" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
 
     </application>
 </manifest>
