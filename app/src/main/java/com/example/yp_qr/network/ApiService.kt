@@ -28,7 +28,6 @@ object ApiService {
                 useCaches = false
                 setRequestProperty("Cache-Control", "no-cache")
                 setRequestProperty("Pragma", "no-cache")
-
                 headers.forEach { (key, value) ->
                     setRequestProperty(key, value)
                 }
@@ -67,6 +66,11 @@ object ApiService {
         }
     }
 
+    /**
+     * Abre una sesión de dispositivo en Yappy.
+     *
+     * @return el token de sesión, o cadena vacía si falla el parseo.
+     */
     suspend fun openDeviceSession(
         apiKey: String,
         secretKey: String,
@@ -108,9 +112,9 @@ object ApiService {
     }
 
     /**
-     * Genera un QR dinámico y extrae el transactionId que devuelve Yappy.
+     * Genera un QR dinámico y extrae el transactionId de la respuesta de Yappy.
      *
-     * @return Triple<localOrderId, yappyTransactionId, fullResponseJson>
+     * @return Triple(localOrderId, yappyTransactionId, fullResponseJson)
      */
     suspend fun generateQrWithToken(
         endpoint: String,
@@ -162,7 +166,6 @@ object ApiService {
                     "ApiService",
                     "💥 Yappy transactionId no encontrado en generateQrWithToken, response=$response"
                 )
-                // Fallback: devolvemos localOrderId y cadena vacía para transactionId
                 Triple(localOrderId, "", response)
             } else {
                 Log.d(
@@ -177,6 +180,9 @@ object ApiService {
         }
     }
 
+    /**
+     * Cancela una transacción existente.
+     */
     suspend fun cancelTransaction(
         transactionId: String,
         token: String,
@@ -195,6 +201,9 @@ object ApiService {
         )
     }
 
+    /**
+     * Obtiene el estado de una transacción.
+     */
     suspend fun getTransactionStatus(
         transactionId: String,
         token: String,
@@ -218,6 +227,9 @@ object ApiService {
         return response
     }
 
+    /**
+     * Cierra la sesión de dispositivo.
+     */
     suspend fun closeDeviceSession(
         token: String,
         apiKey: String,

@@ -1,5 +1,3 @@
-
-// AJUSTA TU PAQUETE REAL (ej. com.example.yappy.screens)
 package com.example.tefbanesco.screens
 
 import android.app.Activity
@@ -8,19 +6,16 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.*
-import com.example.tefbanesco.storage.LocalStorage // AJUSTA TU PAQUETE REAL
-import com.example.tefbanesco.network.ApiService // AJUSTA TU PAQUETE REAL
-import com.example.tefbanesco.utils.toReadableString // Importa tu función helper
+import com.example.tefbanesco.storage.LocalStorage
+import com.example.tefbanesco.network.ApiService
+import com.example.tefbanesco.utils.toReadableString
 import kotlinx.coroutines.launch
-import org.json.JSONObject
 import timber.log.Timber
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import java.text.DecimalFormat
 import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.TimeZone
+import java.util.*
 
 object TefTransactionResults {
     const val RESULT_ACCEPTED = "ACCEPTED"
@@ -29,354 +24,315 @@ object TefTransactionResults {
 }
 
 class QrResultActivity : ComponentActivity() {
+    private val df = DecimalFormat("0.00")
 
+    // HioPOS Input
+    private var originalHioPosTxnIdString: String = ""
+    private var shopDataXml: String = ""
+    private var printerCols: Int = 42
+    private var tipFromHioPos: String = "0"
+    private var taxFromHioPos: String = "0"
+    private var currencyISO: String = ""
+    private var transactionType: String = TefTransactionResults.TYPE_SALE
+
+    // Yappy QR
+    private var qrHash: String = ""
     private var yappyTransactionId: String = ""
     private var localOrderId: String = ""
-    private var transactionDateFromYappy: String = ""
-    private var transactionAmountProcessed: String = ""
-    private var originalHioPosTxnId: Int = 0
-    private var qrHashFromIntent: String = ""
-
-    private var shopDataXmlFromHioPos: String = ""
-    private var printerColsFromHioPos: Int = 42
-    private var tipAmountFromHioPos: String = "0"
-    private var taxAmountFromHioPos: String = "0"
-    private var currencyISOFromHioPos: String = ""
-    private var transactionTypeFromHioPos: String = TefTransactionResults.TYPE_SALE
+    private var yappyDate: String = ""
+    private var processedAmount: String = "0"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Timber.d("🏁 QrResultActivity: onCreate")
 
         intent.extras?.let { extras ->
-            Timber.d("  QrResultActivity: Extras recibidos -> ${extras.toReadableString()}")
-            transactionDateFromYappy    = extras.getString("qrDate") ?: ""
-            yappyTransactionId          = extras.getString("qrTransactionId") ?: ""
-            localOrderId                = extras.getString("localOrderId") ?: ""
-            transactionAmountProcessed  = extras.getString("qrAmount") ?: "0.0"
-            originalHioPosTxnId         = extras.getInt("originalHioPosTransactionId", 0)
-            qrHashFromIntent            = extras.getString("qrHash") ?: ""
-            shopDataXmlFromHioPos       = extras.getString("ShopData") ?: ""
-            printerColsFromHioPos       = extras.getInt("ReceiptPrinterColumns", 42)
-            tipAmountFromHioPos         = extras.getString("TipAmount") ?: "0"
-            taxAmountFromHioPos         = extras.getString("TaxAmount") ?: "0"
-            currencyISOFromHioPos       = extras.getString("CurrencyISO") ?: ""
-            transactionTypeFromHioPos   = extras.getString("TransactionType") ?: TefTransactionResults.TYPE_SALE
+            Timber.d("Extras recibidos -> ${extras.toReadableString()}")
+
+            originalHioPosTxnIdString = extras.getString("originalHioPosTransactionIdString").orEmpty()
+            shopDataXml = extras.getString("ShopData").orEmpty()
+            printerCols = extras.getInt("ReceiptPrinterColumns", 42)
+            tipFromHioPos = extras.getString("TipAmount").orEmpty()
+            taxFromHioPos = extras.getString("TaxAmount").orEmpty()
+            currencyISO = extras.getString("CurrencyISO").orEmpty()
+            transactionType = extras.getString("TransactionType").orEmpty()
+
+            qrHash = extras.getString("qrHash").orEmpty()
+            yappyTransactionId = extras.getString("qrTransactionId").orEmpty()
+            localOrderId = extras.getString("localOrderId").orEmpty()
+
+            processedAmount = extras.getString("qrAmount").orEmpty()
+            yappyDate = extras.getString("qrDate").orEmpty()
         } ?: run {
-            Timber.e("❌ QrResultActivity: Intent sin extras. Finalizando con error.")
-            finishWithError("Error interno: Datos de transacción perdidos por QrResultActivity.", 0)
-            return
-        }
-
-        Timber.i("📄 QrResultActivity: Datos para procesar -> HioPosTxnId=$originalHioPosTxnId, YappyTxnId=$yappyTransactionId, AmountYappy=$transactionAmountProcessed, CurrencyHioPos=$currencyISOFromHioPos, TipHioPos=$tipAmountFromHioPos, TaxHioPos=$taxAmountFromHioPos")
-
-        if (qrHashFromIntent.isBlank()) {
-            Timber.e("❌ QrResultActivity: qrHash vacío. Finalizando.")
-            finishWithError("Error: QR no disponible para mostrar.", originalHioPosTxnId)
-            return
-        }
-        if (yappyTransactionId.isBlank() && originalHioPosTxnId == 0) {
-            Timber.e("❌ QrResultActivity: IDs críticos no disponibles. Finalizando.")
-            finishWithError("Error: IDs de transacción no disponibles.", 0)
+            finishWithError("Error: datos faltantes")
             return
         }
 
         setContent {
+            var showCancel by remember { mutableStateOf(false) }
+            var showSuccess by remember { mutableStateOf(false) }
             val scope = rememberCoroutineScope()
-            var showCancelScreen by remember { mutableStateOf(false) }
-            var showSuccessScreen by remember { mutableStateOf(false) }
 
             when {
-                showCancelScreen -> CancelResultScreen(
+                showCancel -> CancelResultScreen(
                     title = "Pago Cancelado",
                     message = "Transacción Yappy ($yappyTransactionId) cancelada/falló.",
-                    onConfirm = {
-                        Timber.d("UI: CancelScreen confirmada.")
-                        // No llamamos a finish() aquí - ya lo hizo finishWithTransactionResult
-                    }
+                    onConfirm = {}
                 )
-                showSuccessScreen -> SuccessResultScreen(
+                showSuccess -> SuccessResultScreen(
                     title = "Pago Confirmado",
                     message = "Transacción Yappy ($yappyTransactionId) completada.",
-                    onConfirm = {
-                        Timber.d("UI: SuccessScreen confirmada.")
-                        // No llamamos a finish() aquí - ya lo hizo finishWithTransactionResult
-                    }
+                    onConfirm = {}
                 )
                 else -> QrResultScreen(
-                    date = transactionDateFromYappy, transactionId = yappyTransactionId,
-                    hash = qrHashFromIntent, amount = transactionAmountProcessed,
+                    date = yappyDate,
+                    transactionId = yappyTransactionId,
+                    hash = qrHash,
+                    amount = processedAmount,
                     onCancelSuccess = {
-                        Timber.i("🔔 QrResultActivity: onCancelSuccess para YappyTxnId=$yappyTransactionId")
-                        finishWithTransactionResult(TefTransactionResults.RESULT_FAILED, "Transacción Yappy cancelada/fallida/expirada.")
-                        showCancelScreen = true
+                        finishWithTransactionResult(
+                            TefTransactionResults.RESULT_FAILED,
+                            "Transacción cancelada"
+                        )
+                        showCancel = true
                     },
                     onPaymentSuccess = {
-                        Timber.i("🔔 QrResultActivity: onPaymentSuccess para YappyTxnId=$yappyTransactionId")
-                        scope.launch {
-                            try {
-                                val cfg = LocalStorage.getConfig(this@QrResultActivity)
-                                val token = cfg["device_token"].orEmpty()
-                                val apiKey = cfg["api_key"].orEmpty()
-                                val secretKey = cfg["secret_key"].orEmpty()
-                                if (token.isNotBlank()) {
-                                    Timber.d("⏳ QrResultActivity: Cerrando sesión Yappy...")
-                                    ApiService.closeDeviceSession(token, apiKey, secretKey)
-                                    Timber.i("🔒 QrResultActivity: Sesión Yappy cerrada.")
-                                } else {
-                                    Timber.w("⚠️ QrResultActivity: No token Yappy para cerrar.")
-                                }
-                            } catch (e: Exception) {
-                                Timber.e(e, "⚠️ QrResultActivity: Error cerrando sesión Yappy.")
-                            }
-
-                            LocalStorage.saveToken(this@QrResultActivity, "")
-                            Timber.d("🧹 QrResultActivity: Token Yappy borrado.")
-
-                            // IMPORTANTE: Finalizar con resultado exitoso
-                            finishWithTransactionResult(TefTransactionResults.RESULT_ACCEPTED)
-                            showSuccessScreen = true
-                        }
+                        scope.launch { closeSession() }
+                        showSuccess = true
                     }
                 )
             }
         }
     }
 
-    private fun buildReceiptLine(text: String, format: String = "BOLD", centered: Boolean = false): String {
-        var lineText = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        val maxLength = printerColsFromHioPos
-        if (centered) {
-            val textLength = lineText.length
-            if (textLength < maxLength) {
-                val padding = (maxLength - textLength) / 2
-                if (padding > 0) lineText = " ".repeat(padding) + lineText
-            }
+    private suspend fun closeSession() {
+        try {
+            val cfg = LocalStorage.getConfig(this)
+            ApiService.closeDeviceSession(
+                token = cfg["device_token"].orEmpty(),
+                apiKey = cfg["api_key"].orEmpty(),
+                secretKey = cfg["secret_key"].orEmpty()
+            )
+        } catch (e: Exception) {
+            Timber.e(e, "Error cerrando sesión Yappy")
+        } finally {
+            LocalStorage.saveToken(this, "")
+            finishWithTransactionResult(TefTransactionResults.RESULT_ACCEPTED)
         }
-        lineText = lineText.take(maxLength)
-        return """
-        |  <ReceiptLine type="TEXT">
-        |    <Formats><Format from="0" to="$maxLength">$format</Format></Formats>
-        |    <Text>$lineText</Text>
-        |  </ReceiptLine>
-        """.trimMargin() + "\n"
     }
 
-    private fun finishWithTransactionResult(result: String, errorMessage: String? = null) {
-        Timber.d("🚀 QrResultActivity.finishWithTransactionResult: Preparando respuesta. Result: $result, HioPosTxnId: $originalHioPosTxnId")
+    private fun finishWithTransactionResult(
+        result: String,
+        errorMessage: String? = null
+    ) {
+        Timber.d("🏁 Preparando resultado para HioPos: Result=$result, ErrorMsg=$errorMessage")
 
-        val shopInfo = parseShopData(shopDataXmlFromHioPos)
-        val currencySymbolForReceipt = mapCurrencyISOToSymbol(currencyISOFromHioPos)
-        val displayDateForReceipt = formatDisplayDateForReceipt(transactionDateFromYappy, "dd-MM-yyyy hh:mm:ss")
+        val amountDouble = processedAmount.toDoubleOrNull() ?: 0.0
+        val amountForHioPos = df.format(amountDouble)
+            .replace(".", "")
+            .replace(",", "")
+        Timber.d("Calculado amountForHioPos: '$amountForHioPos' desde processedAmount: '$processedAmount'")
 
-        val merchantReceiptXml = buildString {
-            append("<Receipt numCols=\"$printerColsFromHioPos\">\n")
-            append(buildReceiptLine(" ", "NORMAL")) // Línea vacía inicial
-            append(buildReceiptLine("*** COPIA COMERCIO ***", "BOLD", centered = true))
-            append(buildReceiptLine(shopInfo["name"] ?: "COMERCIO", "BOLD", centered = true))
-            shopInfo["fiscalId"]?.takeIf { it.isNotBlank() }?.let {
-                append(buildReceiptLine("RIF/ID: $it", "BOLD", centered = true))
-            }
+        val merchantReceipt = buildReceipt(
+            numCols = printerCols,
+            shopXml = shopDataXml,
+            txnType = transactionType,
+            txnId = yappyTransactionId,
+            amount = processedAmount,
+            currencyIso = currencyISO,
+            date = yappyDate,
+            result = result,
+            errorMessage = errorMessage,
+            originalPosId = originalHioPosTxnIdString
+        )
+        val customerReceipt = merchantReceipt
 
-            append(buildReceiptLine("-".repeat(printerColsFromHioPos), "BOLD"))
+        Timber.d("Recibo generado (Merchant):")
+        merchantReceipt.lines().forEach { Timber.d(it) }
 
-            append(buildReceiptLine("TRANSACCION: ${transactionTypeFromHioPos.uppercase(Locale.ROOT)} YAPPY", "BOLD"))
-            append(buildReceiptLine("FECHA: $displayDateForReceipt", "BOLD"))
-
-            val formato = DecimalFormat("0.00")
-            val amountDblReceipt = transactionAmountProcessed.toDoubleOrNull() ?: 0.0
-            val amountFormatted = formato.format(amountDblReceipt)
-            append(buildReceiptLine("MONTO: $amountFormatted $currencySymbolForReceipt", "BOLD"))
-
-            append(buildReceiptLine("ID YAPPY: $yappyTransactionId", "BOLD"))
-            if(originalHioPosTxnId != 0) append(buildReceiptLine("ID POS: $originalHioPosTxnId", "BOLD"))
-
-            val estadoTxt = if(result == TefTransactionResults.RESULT_ACCEPTED) "APROBADA" else "FALLIDA"
-            append(buildReceiptLine("ESTADO: $estadoTxt", "BOLD"))
-
-            if(result == TefTransactionResults.RESULT_FAILED && !errorMessage.isNullOrBlank()){
-                append(buildReceiptLine("ERROR: $errorMessage", "BOLD"))
-            }
-
-            append(buildReceiptLine(" ", "NORMAL"))
-            append(buildReceiptLine("Gracias por su compra!", "BOLD", centered = true))
-            append(buildReceiptLine(" ", "NORMAL"))
-
-            // CUT_PAPER correctamente formateado según BAC
-            append("""
-            |  <ReceiptLine type="CUT_PAPER">
-            |    <Formats><Format from="0" to="$printerColsFromHioPos">BOLD</Format></Formats>
-            |    <Text>                                          </Text>
-            |  </ReceiptLine>
-            """.trimMargin())
-            append("\n</Receipt>")
-        }.also { Timber.v("📄 QrResultActivity: MerchantReceipt XML:\n$it") }
-
-        val customerReceiptXml = merchantReceiptXml.replace("*** COPIA COMERCIO ***", "*** COPIA CLIENTE ***")
-            .replace("RIF/ID:", " ")
-            .replace(Regex("ID POS:.*(\r\n|\r|\n)"), " ")
-
-        // CORRECCIÓN: Formatear los montos correctamente para HioPOS
-        val formato = DecimalFormat("0.00")
-        val amountDouble = transactionAmountProcessed.toDoubleOrNull() ?: 0.0
-
-        // CORRECCIÓN: asegurar que el formato sea correcto - sin punto decimal
-        val amountMainForHioPos = formato.format(amountDouble).replace(".", "")
-
-        // CORRECCIÓN: asegurar que el intent tenga la acción correcta
         val resultIntent = Intent("icg.actions.electronicpayment.tefbanesco.TRANSACTION").apply {
             putExtra("TransactionResult", result)
-            putExtra("TransactionType", transactionTypeFromHioPos)
-            putExtra("TransactionId", originalHioPosTxnId)
-            putExtra("Amount", amountMainForHioPos)
-            putExtra("TipAmount", tipAmountFromHioPos)
-            putExtra("TaxAmount", taxAmountFromHioPos)
+            putExtra("TransactionType", transactionType)
+            putExtra("Amount", amountForHioPos.toString())
+            putExtra("TipAmount", tipFromHioPos.toString())
+            putExtra("TaxAmount", taxFromHioPos.toString())
+            putExtra("TransactionData", "${yappyTransactionId}/${localOrderId}")
+            putExtra("BatchNumber", "000123")  // lote número 123
 
-            if (currencyISOFromHioPos.isNotBlank()) {
-                putExtra("CurrencyISO", currencyISOFromHioPos)
-            }
-
-            // CORRECCIÓN: Formato correcto para TransactionData siguiendo la estructura de BAC
-            val transactionDataToReturn = "$yappyTransactionId/$localOrderId"
-            Timber.d("  Usando para TransactionData: '$transactionDataToReturn'")
-            putExtra("TransactionData", transactionDataToReturn)
-
-            putExtra("MerchantReceipt", merchantReceiptXml)
-            putExtra("CustomerReceipt", customerReceiptXml)
-
-            if (result == TefTransactionResults.RESULT_FAILED && !errorMessage.isNullOrBlank()) {
+            putExtra("TransactionId", originalHioPosTxnIdString)
+            putExtra("CurrencyISO", currencyISO)
+            putExtra("MerchantReceipt", merchantReceipt)
+            putExtra("CustomerReceipt", customerReceipt)
+            if (result == TefTransactionResults.RESULT_FAILED && errorMessage != null) {
                 putExtra("ErrorMessage", errorMessage)
+                putExtra("ErrorMessageTitle", "Error Pago Yappy")
+                Timber.w("Enviando error: $errorMessage")
             }
+//
+            putExtra("TenderType", "CREDIT") //flata
+            putExtra("DocumentData", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Document><Header><HeaderField Key=\"PosId\">4</HeaderField><HeaderField Key=\"Alias\"/><HeaderField Key=\"SaleId\">bf2d97aa-73ae-491f-a507-41a815ed5032</HeaderField><HeaderField Key=\"Serie\"/><HeaderField Key=\"Number\">0</HeaderField><HeaderField Key=\"DocumentTypeId\">0</HeaderField><HeaderField Key=\"Z\">1</HeaderField><HeaderField Key=\"Date\">05-12-2025</HeaderField><HeaderField Key=\"Time\">10:33:14</HeaderField><HeaderField Key=\"IsTaxIncluded\">false</HeaderField><HeaderField Key=\"IsClosed\">false</HeaderField><HeaderField Key=\"IsSubTotalized\">false</HeaderField><HeaderField Key=\"TaxesAmount\">1.6800</HeaderField><HeaderField Key=\"NetAmount\">25.6800</HeaderField><HeaderField Key=\"ServiceTypeId\">0</HeaderField><HeaderField Key=\"ServiceNumber\">0</HeaderField><HeaderField Key=\"LoyaltyCardNumber\"/><HeaderField Key=\"LoyaltyCardPoints\">0.0000</HeaderField><HeaderField Key=\"LoyaltyCardBalance\">0.0000</HeaderField><HeaderField Key=\"LoyaltyCardTypeId\">0</HeaderField><HeaderField Key=\"PrintCount\">0</HeaderField><HeaderField Key=\"BlockToPrint\">null</HeaderField><HeaderField Key=\"TicketToPrint\"/><HeaderField Key=\"Rounding\">0.0000</HeaderField><HeaderField Key=\"TaxExemption\"/><HeaderField Key=\"IsoDocumentId\"/><HeaderField Key=\"IsDemo\">false</HeaderField><HeaderField Key=\"DocumentAPIPromoData\"/><HeaderField Key=\"ChannelId\">0</HeaderField><HeaderField Key=\"ChannelName\"/><HeaderField Key=\"ControlCode\"/><HeaderField Key=\"PriceListId\">1</HeaderField><HeaderField Key=\"CurrencyISOCode\">PAB</HeaderField><HeaderField Key=\"CurrencyExchangeRate\">1.0000</HeaderField><HeaderField Key=\"CurrencyId\">1</HeaderField><HeaderField Key=\"IsRoomCharge\">false</HeaderField><HeaderField Key=\"RoomName\"/><CustomDocHeaderFields/><Discount><DiscountField Key=\"DiscountReasonId\">0</DiscountField><DiscountField Key=\"Percentage\">0.0000</DiscountField><DiscountField Key=\"Amount\">0.0000</DiscountField><DiscountField Key=\"AmountWithTaxes\">0.0000</DiscountField></Discount><Company><CompanyField Key=\"CompanyId\">71428</CompanyField><CompanyField Key=\"FiscalId\">143224-532-2024  DV00</CompanyField><CompanyField Key=\"Name\">My T-Shirt Love</CompanyField><CompanyField Key=\"TradeName\">RETAIL S.A.</CompanyField><CompanyField Key=\"FiscalName\">RETAIL S.A.</CompanyField><CompanyField Key=\"CorrectTradeName\">My T-Shirt Love</CompanyField><CompanyField Key=\"Address\">Calle 50</CompanyField><CompanyField Key=\"PostalCode\">123</CompanyField><CompanyField Key=\"City\">Panamá</CompanyField><CompanyField Key=\"Phone\">62902519</CompanyField><CompanyField Key=\"Email\">retail@hypernovalabs.com</CompanyField><CustomCompanyFields/><CustomAccountingCompanyFields/></Company><Shop><ShopField Key=\"ShopId\">1</ShopField><ShopField Key=\"FiscalId\">143224-532-2024</ShopField><ShopField Key=\"Name\">My T-Shirt Love Suc. 1</ShopField><ShopField Key=\"TradeName\">RETAIL S.A.</ShopField><ShopField Key=\"FiscalName\">RETAIL S.A.</ShopField><ShopField Key=\"CorrectTradeName\">My T-Shirt Love Suc. 1</ShopField><ShopField Key=\"Address\">COMPROBANTE AUXILIAR DE FACTURA ELECTRÓNICA</ShopField><ShopField Key=\"PostalCode\">123</ShopField><ShopField Key=\"City\">Panamá</ShopField><ShopField Key=\"State\">Panamá</ShopField><ShopField Key=\"Phone\">62902519</ShopField><ShopField Key=\"Email\">retail@hypernovalabs.com</ShopField><ShopField Key=\"DefaultPriceListId\">1</ShopField><ShopField Key=\"DefaultPriceListName\">Tarifa por defecto</ShopField><ShopField Key=\"MainCurrencyId\">1</ShopField><ShopField Key=\"MainCurrencyName\">Balboa</ShopField><ShopField Key=\"LanguageIsoCode\">es</ShopField><ShopField Key=\"CountryIsoCode\">PAN</ShopField><ShopField Key=\"Web\"/><CustomShopFields/></Shop><Seller><SellerField Key=\"SellerId\">2</SellerField><SellerField Key=\"ContactType\">1</SellerField><SellerField Key=\"Gender\">0</SellerField><SellerField Key=\"FiscalIdDocType\">0</SellerField><SellerField Key=\"FiscalId\"/><SellerField Key=\"Name\">Administrador 1</SellerField><SellerField Key=\"GivenName1\"/><SellerField Key=\"Address\"/><SellerField Key=\"PostalCode\"/><SellerField Key=\"City\"/><SellerField Key=\"State\"/><SellerField Key=\"Phone\"/><SellerField Key=\"Email\"/></Seller><Customer><CustomerField Key=\"customerId\">0</CustomerField></Customer><Provider><ProviderField Key=\"providerId\">null</ProviderField></Provider><DocCurrency><DocCurrencyField Key=\"CurrencyId\">1</DocCurrencyField><DocCurrencyField Key=\"Name\">Balboa</DocCurrencyField><DocCurrencyField Key=\"DecimalCount\">2</DocCurrencyField><DocCurrencyField Key=\"Initials\">B/.</DocCurrencyField><DocCurrencyField Key=\"InitialsBefore\">1</DocCurrencyField><DocCurrencyField Key=\"IsoCode\">PAB</DocCurrencyField><DocCurrencyField Key=\"ExchangeRate\">1.0</DocCurrencyField></DocCurrency></Header><Lines><Line><LineField Key=\"LineId\">40e7189e-ec48-4db7-bc6e-534a0436a4f2</LineField><LineField Key=\"LineNumber\">1</LineField><LineField Key=\"ProductId\">34</LineField><LineField Key=\"ProductSizeId\">350</LineField><LineField Key=\"ExternalProductId\">0</LineField><LineField Key=\"Name\">T-SHIRT BOXY FIT</LineField><LineField Key=\"Size\">M / Único</LineField><LineField Key=\"Units\">1.0000</LineField><LineField Key=\"IsMenu\">false</LineField><LineField Key=\"PortionId\">0</LineField><LineField Key=\"IsGift\">false</LineField><LineField Key=\"PriceListId\">1</LineField><LineField Key=\"Price\">12.0000</LineField><LineField Key=\"SellerId\">2</LineField><LineField Key=\"WarehouseId\">2</LineField><LineField Key=\"DiscountReasonId\">0</LineField><LineField Key=\"ReturnReasonId\">0</LineField><LineField Key=\"ReturnReasonName\"/><LineField Key=\"DiscountPercentage\">0.0000</LineField><LineField Key=\"DiscountAmount\">0.0000</LineField><LineField Key=\"DiscountAmountWithTaxes\">0.0000</LineField><LineField Key=\"BaseAmount\">12.0000</LineField><LineField Key=\"TaxesAmount\">0.8400</LineField><LineField Key=\"TaxCategory\">0</LineField><LineField Key=\"NetAmount\">12.8400</LineField><LineField Key=\"Measure\">1.0000</LineField><LineField Key=\"MeasureInitials\"/><LineField Key=\"IsNew\">false</LineField><LineField Key=\"ProductReference\"/><LineField Key=\"ProductBarcode\"/><LineField Key=\"ServiceTypeId\">0</LineField><LineField Key=\"DestinationWarehouseId\">0</LineField><LineField Key=\"ReturnSaleSerie\"/><LineField Key=\"ReturnSaleNumber\"/><LineField Key=\"ReturnLineServiceTypeId\">0</LineField><LineField Key=\"ProductType\">Product</LineField><LineField Key=\"UsesStock\">true</LineField><LineField Key=\"FamilyId\">1</LineField><CustomProductFields/><CustomProductSizeFields/><CustomDocLineFields/><LineTaxes><LineTax><LineTaxField Key=\"TaxId\">1</LineTaxField><LineTaxField Key=\"Position\">1</LineTaxField><LineTaxField Key=\"Percentage\">7.0000</LineTaxField><CustomDocLineTaxFields/><CustomTaxFields/></LineTax></LineTaxes><CustomDocLineSummaryFields/></Line><Line><LineField Key=\"LineId\">5e6fb1aa-b7fe-4ef8-b204-b1d9e2d28118</LineField><LineField Key=\"LineNumber\">2</LineField><LineField Key=\"ProductId\">30</LineField><LineField Key=\"ProductSizeId\">311</LineField><LineField Key=\"ExternalProductId\">0</LineField><LineField Key=\"Name\">T-SHIRT SLIM FIT</LineField><LineField Key=\"Size\">S / AZUL</LineField><LineField Key=\"Units\">1.0000</LineField><LineField Key=\"IsMenu\">false</LineField><LineField Key=\"PortionId\">0</LineField><LineField Key=\"IsGift\">false</LineField><LineField Key=\"PriceListId\">1</LineField><LineField Key=\"Price\">12.0000</LineField><LineField Key=\"SellerId\">2</LineField><LineField Key=\"WarehouseId\">2</LineField><LineField Key=\"DiscountReasonId\">0</LineField><LineField Key=\"ReturnReasonId\">0</LineField><LineField Key=\"ReturnReasonName\"/><LineField Key=\"DiscountPercentage\">0.0000</LineField><LineField Key=\"DiscountAmount\">0.0000</LineField><LineField Key=\"DiscountAmountWithTaxes\">0.0000</LineField><LineField Key=\"BaseAmount\">12.0000</LineField><LineField Key=\"TaxesAmount\">0.8400</LineField><LineField Key=\"TaxCategory\">0</LineField><LineField Key=\"NetAmount\">12.8400</LineField><LineField Key=\"Measure\">1.0000</LineField><LineField Key=\"MeasureInitials\"/><LineField Key=\"IsNew\">false</LineField><LineField Key=\"ProductReference\"/><LineField Key=\"ProductBarcode\"/><LineField Key=\"ServiceTypeId\">0</LineField><LineField Key=\"DestinationWarehouseId\">0</LineField><LineField Key=\"ReturnSaleSerie\"/><LineField Key=\"ReturnSaleNumber\"/><LineField Key=\"ReturnLineServiceTypeId\">0</LineField><LineField Key=\"ProductType\">Product</LineField><LineField Key=\"UsesStock\">true</LineField><LineField Key=\"FamilyId\">1</LineField><CustomProductFields/><CustomProductSizeFields/><CustomDocLineFields/><LineTaxes><LineTax><LineTaxField Key=\"TaxId\">1</LineTaxField><LineTaxField Key=\"Position\">1</LineTaxField><LineTaxField Key=\"Percentage\">7.0000</LineTaxField><CustomDocLineTaxFields/><CustomTaxFields/></LineTax></LineTaxes><CustomDocLineSummaryFields/></Line></Lines><Taxes><Tax><TaxField Key=\"TaxId\">1</TaxField><TaxField Key=\"Description\">ITBMS 7%</TaxField><TaxField Key=\"LineNumber\">1</TaxField><TaxField Key=\"TaxBase\">24.0000</TaxField><TaxField Key=\"Percentage\">7.0000</TaxField><TaxField Key=\"TaxAmount\">1.6800</TaxField><TaxField Key=\"FiscalId\"/><TaxField Key=\"ExemptReason\"/><TaxField Key=\"IsoCode\"/><CustomDocTaxFields/><CustomTaxFields/></Tax></Taxes><PaymentMeans><PaymentMean><PaymentMeanField Key=\"PaymentMeanId\">2</PaymentMeanField><PaymentMeanField Key=\"Type\">0</PaymentMeanField><PaymentMeanField Key=\"LineNumber\">1</PaymentMeanField><PaymentMeanField Key=\"Description\">Visa</PaymentMeanField><PaymentMeanField Key=\"PaymenMeanName\">Visa</PaymentMeanField><PaymentMeanField Key=\"Amount\">25.6800</PaymentMeanField><PaymentMeanField Key=\"CurrencyISOCode\">PAB</PaymentMeanField><PaymentMeanField Key=\"CurrencyExchangeRate\">1.0000</PaymentMeanField><PaymentMeanField Key=\"TransactionId\"/><PaymentMeanField Key=\"AuthorizationId\"/><PaymentMeanField Key=\"ChargeDiscountType\">0</PaymentMeanField><PaymentMeanField Key=\"ChargeDiscountValue\">0.0000</PaymentMeanField><CustomPaymentMeanFields/><CustomDocPaymentMeanFields/><Currency><CurrencyField Key=\"Name\">Balboa</CurrencyField><CurrencyField Key=\"Initials\">B/.</CurrencyField><CurrencyField Key=\"InitialsBefore\">true</CurrencyField><CurrencyField Key=\"DecimalCount\">2</CurrencyField><CurrencyField Key=\"IsoCode\">PAB</CurrencyField><CustomCurrencyFields/></Currency><CurrencyField Key=\"CurrencyId\">1</CurrencyField></PaymentMean></PaymentMeans><AdditionalFields><AdditionalField Key=\"5000013\">COMPROBANTE AUXILIAR DE FACTURA ELECTRÓNICA</AdditionalField><AdditionalField Key=\"5000014\">Panamá</AdditionalField><AdditionalField Key=\"5000016\">retail@hypernovalabs.com</AdditionalField><AdditionalField Key=\"5000012\">143224-532-2024</AdditionalField><AdditionalField Key=\"5000010\">My T-Shirt Love Suc. 1</AdditionalField><AdditionalField Key=\"5000017\">62902519</AdditionalField><AdditionalField Key=\"5000015\">123</AdditionalField><AdditionalField Key=\"5000011\">RETAIL S.A.</AdditionalField><AdditionalField Key=\"5000009\">Administrador 1</AdditionalField></AdditionalFields></Document>")
+//            putExtra("LanguageISO", "es")
+            putExtra("ShopData", shopDataXml)
+            putExtra("ReceiptPrinterColumns", "42")
+            putExtra("SellerData","<?xml version='1.0' encoding='utf-8'?>\n" +
+                    "<transactionRequestTaxDetail>\n" +
+                    "   <taxList class=\"java.util.ArrayList\">\n" +
+                    "      <taxDetail>\n" +
+                    "         <exemptReason></exemptReason>\n" +
+                    "         <fiscalId></fiscalId>\n" +
+                    "         <percentage>700</percentage>\n" +
+                    "         <taxAmount>168</taxAmount>\n" +
+                    "         <taxBase>2400</taxBase>\n" +
+                    "         <taxId>1</taxId>\n" +
+                    "      </taxDetail>\n" +
+                    "   </taxList>\n" +
+                    "</transactionRequestTaxDetail>")
         }
-
-        // CORRECCIÓN: Corregir el log para referirse al intent correcto
-        Timber.d("resultIntent -> ${resultIntent.extras?.toReadableString()}")
-
-        Timber.i("📬 QrResultActivity: Respuesta final para Hiopos -> ${resultIntent.extras?.toReadableString()}")
-
-        // Imprimir extras en orden definido
-        val extras = resultIntent.extras
-        val orderedKeys = listOf(
-            "TransactionResult", "TransactionType", "TransactionId",
-            "Amount", "TipAmount", "TaxAmount", "CurrencyISO",
-            "TransactionData",
-            "ErrorMessage","MerchantReceipt", "CustomerReceipt"
-        )
-        if (extras != null) {
-            Timber.i("📬 QrResultActivity: Respuesta final para Hiopos -> Extras en orden:")
-            orderedKeys.forEach { key ->
-                if (extras.containsKey(key)) {
-                    val value = extras.get(key)
-                    Timber.i("Hiopos -> Extras  ↳ $key: $value")
+        Timber.i("TransactionId: $originalHioPosTxnIdString")
+        Timber.i("✅ Enviando RESULTADO a HioPos:")
+        Timber.i("✅ Action: ${resultIntent.action}")
+        resultIntent.extras?.let {
+            val basicInfo = StringBuilder("Bundle[")
+            it.keySet().forEach { key ->
+                if (key != "MerchantReceipt" && key != "CustomerReceipt") {
+                    basicInfo.append("$key=${it.get(key)}, ")
                 }
             }
-        } else {
-            Timber.i("📬 QrResultActivity: El Bundle de extras es nulo.")
-        }
+            if (basicInfo.length > 7) basicInfo.setLength(basicInfo.length - 2)
+            basicInfo.append("]")
+            Timber.i("✅ Extras Bundle (sin recibos): $basicInfo")
 
-        // IMPORTANTE: Configurar el resultado y finalizar la actividad
+            Timber.i("✅ Extras Bundle - MerchantReceipt:")
+            it.getString("MerchantReceipt")?.lines()?.forEach { Timber.i(it) }
+            Timber.i("✅ Extras Bundle - CustomerReceipt:")
+            it.getString("CustomerReceipt")?.lines()?.forEach { Timber.i(it) }
+
+            val transactionIdValue = it.get("TransactionId")
+            val transactionIdType = transactionIdValue?.javaClass?.simpleName ?: "null"
+            Timber.i("✅ Verificación TIPO TransactionId en Bundle: $transactionIdType (Valor: '$transactionIdValue')")
+        } ?: Timber.w("✅ Extras Bundle es NULL al enviar resultado.")
+        Timber.i("✅ resultIntent->-> ::: ${resultIntent.extras.toReadableString()}")
+
         setResult(Activity.RESULT_OK, resultIntent)
         finish()
+        Timber.i("🏁 QrResultActivity finalizada.")
     }
 
-    private fun parseShopData(xmlString: String): Map<String, String> {
-        val data = mutableMapOf<String, String>()
-        if (xmlString.isBlank()) { Timber.w("parseShopData: XML ShopData vacío."); return data }
+    private fun finishWithError(message: String) {
+        finishWithTransactionResult(TefTransactionResults.RESULT_FAILED, message)
+    }
+
+    private fun buildReceipt(
+        numCols: Int,
+        shopXml: String,
+        txnType: String,
+        txnId: String,
+        amount: String,
+        currencyIso: String,
+        date: String,
+        result: String,
+        errorMessage: String?,
+        originalPosId: String?
+    ): String {
+        val shopData = parseShopData(shopXml)
+        val symbol = mapCurrencyISOToSymbol(currencyIso)
+        val formattedDate = formatDisplayDateForReceipt(date, "dd-MM-yyyy HH:mm:ss")
+
+        return buildString {
+            append("<Receipt numCols=\"$numCols\">\n")
+            append(buildLine("*** COPIA COMERCIO ***", numCols, "BOLD", true))
+            append(buildLine(shopData["name"].orEmpty(), numCols, "BOLD", true))
+            shopData["fiscalId"]?.let { append(buildLine("RIF/ID: $it", numCols, "BOLD", true)) }
+            append(buildLine("-".repeat(numCols), numCols))
+            append(buildLine("TRANSACCION: ${txnType.uppercase(Locale.ROOT)}", numCols))
+            append(buildLine("FECHA: $formattedDate", numCols))
+            append(buildLine("MONTO: ${df.format(amount.toDoubleOrNull() ?: 0.0)} $symbol", numCols, "BOLD"))
+            append(buildLine("ID YAPPY: $txnId", numCols))
+            originalPosId?.takeIf { it.isNotBlank() }?.let { append(buildLine("ID POS: $it", numCols)) }
+            append(buildLine("-".repeat(numCols), numCols))
+            append(buildLine("ESTADO: ${if (result == TefTransactionResults.RESULT_ACCEPTED) "APROBADA" else "FALLIDA"}", numCols, "BOLD"))
+            errorMessage?.takeIf { it.isNotBlank() }?.let { append(buildLine("MENSAJE: $it", numCols)) }
+            append(buildLine(" ", numCols))
+            append(buildLine("GRACIAS POR SU PAGO CON YAPPY!", numCols, "NORMAL", true))
+            append(buildLine(" ", numCols))
+            append("</Receipt>")
+        }
+    }
+
+    private fun buildLine(
+        text: String,
+        numCols: Int,
+        format: String = "NORMAL",
+        centered: Boolean = false
+    ): String {
+        var t = text.xmlEscape()
+        if (centered && t.length < numCols) {
+            val pad = (numCols - t.length) / 2
+            t = " ".repeat(pad) + t
+        }
+        t = t.take(numCols)
+        return "<ReceiptLine type=\"TEXT\">" +
+                "<Formats><Format from=\"0\" to=\"$numCols\">$format</Format></Formats>" +
+                "<Text>$t</Text></ReceiptLine>\n"
+    }
+
+    private fun parseShopData(xml: String): Map<String, String> {
+        val data = mutableMapOf<String,String>()
+        if (xml.isBlank()) return data
         try {
-            Timber.d("parseShopData: Parseando: ${xmlString.take(100)}...")
             val factory = XmlPullParserFactory.newInstance().apply { isNamespaceAware = false }
-            val parser = factory.newPullParser().apply { setInput(xmlString.reader()) }
-            var eventType = parser.eventType; var currentTagName: String? = null
-            while (eventType != XmlPullParser.END_DOCUMENT) {
-                when (eventType) {
-                    XmlPullParser.START_TAG -> currentTagName = parser.name
-                    XmlPullParser.TEXT -> {
-                        val text = parser.text?.trim()
-                        if (currentTagName != null && !text.isNullOrBlank()) {
-                            val key = if (currentTagName == "cityWithPostalCode") "city" else currentTagName
-                            data[key] = text
-                        }
-                    }
-                    XmlPullParser.END_TAG -> currentTagName = null
+            val parser = factory.newPullParser().apply { setInput(xml.reader()) }
+            var tag: String? = null
+            var event = parser.eventType
+            while (event != XmlPullParser.END_DOCUMENT) {
+                when (event) {
+                    XmlPullParser.START_TAG -> tag = parser.name
+                    XmlPullParser.TEXT -> parser.text.trim().let { if (tag != null) data[tag] = it }
+                    XmlPullParser.END_TAG -> tag = null
                 }
-                eventType = parser.next()
+                event = parser.next()
             }
-            Timber.d("parseShopData: Completado: $data")
-        } catch (e: Exception) { Timber.e(e, "parseShopData: Error.") }
+        } catch (e: Exception) {
+            Timber.e(e, "parseShopData error")
+        }
         return data
     }
 
-    private fun formatDisplayDateForReceipt(isoDate: String?, desiredFormat: String = "dd/MM/yyyy HH:mm:ss"): String {
-        if (isoDate.isNullOrBlank()) return "N/A"
+    private fun formatDisplayDateForReceipt(iso: String, pattern: String): String {
         return try {
-            val inputFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }
-            val dateObj = inputFmt.parse(isoDate)
-            val outputFmt = SimpleDateFormat(desiredFormat, Locale.getDefault())
-            dateObj?.let { outputFmt.format(it) } ?: isoDate
-        } catch (e: Exception) { Timber.w(e, "formatDisplayDate Error: $isoDate"); isoDate }
-    }
-
-    private fun mapNumericISOToAlpha(numericISO: String?): String {
-        if (numericISO.isNullOrBlank()) return ""
-        return when (numericISO) {
-            "590" -> "PAB"; "840" -> "USD"
-            "PAB", "USD" -> numericISO
-            else -> numericISO
+            val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
+                .apply { timeZone = TimeZone.getTimeZone("UTC") }
+            val date = parser.parse(iso) ?: return iso
+            SimpleDateFormat(pattern, Locale.getDefault()).format(date)
+        } catch (e: Exception) {
+            iso
         }
     }
 
-    private fun mapCurrencyISOToSymbol(isoAlphaOrNumeric: String): String {
-        val alphaISO = mapNumericISOToAlpha(isoAlphaOrNumeric)
-        return when (alphaISO.uppercase(Locale.US)) {
-            "PAB" -> "B/."; "USD" -> "$"
-            else -> alphaISO
-        }
+    private fun mapNumericISOToAlpha(numeric: String): String = when (numeric) {
+        "590" -> "PAB"
+        "840" -> "USD"
+        else -> numeric
     }
 
-    private fun finishWithError(errorMessage: String, hioPosTxnIdToReturn: Int = originalHioPosTxnId) {
-        Timber.e("‼️ QrResultActivity.finishWithError: HioPosTxnId=$hioPosTxnIdToReturn, Error='$errorMessage'")
-
-        // CORRECCIÓN: Usar la acción correcta en el intent
-        val resultIntent = Intent("icg.actions.electronicpayment.tefbanesco.TRANSACTION").apply {
-            putExtra("TransactionResult", TefTransactionResults.RESULT_FAILED)
-            putExtra("TransactionType", transactionTypeFromHioPos)
-            putExtra("ErrorMessage", errorMessage)
-            if (hioPosTxnIdToReturn != 0) putExtra("TransactionId", hioPosTxnIdToReturn)
-
-            // CORRECCIÓN: Unificar formato para TransactionData
-            val transactionDataToReturn = if (yappyTransactionId.isNotBlank()) {
-                "$yappyTransactionId/$localOrderId"
-            } else {
-                "ERROR/$localOrderId"
-            }
-            putExtra("TransactionData", transactionDataToReturn)
-
-            // CORRECCIÓN: Formatear monto correctamente como en BAC (sin punto decimal)
-            val formato = DecimalFormat("0.00")
-            val amountDbl = transactionAmountProcessed.toDoubleOrNull() ?: 0.0
-            val amountFormatted = formato.format(amountDbl).replace(".", "")
-            putExtra("Amount", amountFormatted)
-
-            // CORRECCIÓN: Incluir todos los extras esperados por HIOPOS
-            putExtra("TipAmount", tipAmountFromHioPos)
-            putExtra("TaxAmount", taxAmountFromHioPos)
-
-            if (currencyISOFromHioPos.isNotBlank()) {
-                putExtra("CurrencyISO", currencyISOFromHioPos)
-            }
-        }
-
-        Timber.i("  📤 QrResultActivity.finishWithError: Enviando error a Hiopos: ${resultIntent.extras?.toReadableString()}")
-        setResult(Activity.RESULT_OK, resultIntent)
-        finish()
+    private fun mapCurrencyISOToSymbol(iso: String): String = when (mapNumericISOToAlpha(iso).uppercase()) {
+        "PAB" -> "B/."
+        "USD" -> "$"
+        else -> iso
     }
 }
 
-// Extension function para mejorar la calidad del XML generado
-fun String.xmlEscape(): String {
-    return this.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace("\"", "&quot;")
-        .replace("'", "&apos;")
+fun String.xmlEscape(): String = this.replace("&", "&amp;")
+    .replace("<", "&lt;")
+    .replace(">", "&gt;")
+    .replace("\"", "&quot;")
+    .replace("'", "&apos;")
+
+fun Bundle.toReadableString(): String {
+    if (this.isEmpty) return "Bundle[empty]"
+    val sb = StringBuilder("Bundle[")
+    for (key in keySet()) sb.append(key).append("=").append(get(key)).append(", ")
+    if (sb.endsWith(", ")) sb.setLength(sb.length - 2)
+    sb.append("]")
+    return sb.toString()
 }

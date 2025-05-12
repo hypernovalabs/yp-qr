@@ -41,7 +41,7 @@ class MainActivity : ComponentActivity() {
 
             transactionHandler = TransactionHandler(
                 activity = this,
-                onSuccess = null // ✅ Ya no es necesario usarlo en MainActivity
+//                onSuccess = null // ✅ Ya no es necesario usarlo en MainActivity
             )
 
             MainContent(
