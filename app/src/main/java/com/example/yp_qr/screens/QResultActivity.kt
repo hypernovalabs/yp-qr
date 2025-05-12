@@ -144,7 +144,7 @@ class QrResultActivity : ComponentActivity() {
     }
 
     private fun buildReceiptLine(text: String, format: String = "BOLD", centered: Boolean = false): String {
-        var lineText = text.replace("&", "&").replace("<", "<").replace(">", ">")
+        var lineText = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         val maxLength = printerColsFromHioPos
         if (centered) {
             val textLength = lineText.length
@@ -216,20 +216,19 @@ class QrResultActivity : ComponentActivity() {
             .replace("RIF/ID:", " ")
             .replace(Regex("ID POS:.*(\r\n|\r|\n)"), " ")
 
-        val batchReceiptXml = "<Receipt numCols=\"$printerColsFromHioPos\"></Receipt>"
+        // CORRECCIÓN: Formatear los montos correctamente para HioPOS
+        val formato = DecimalFormat("0.00")
+        val amountDouble = transactionAmountProcessed.toDoubleOrNull() ?: 0.0
 
+        // CORRECCIÓN: asegurar que el formato sea correcto - sin punto decimal
+        val amountMainForHioPos = formato.format(amountDouble).replace(".", "")
+
+        // CORRECCIÓN: asegurar que el intent tenga la acción correcta
         val resultIntent = Intent("icg.actions.electronicpayment.tefbanesco.TRANSACTION").apply {
             putExtra("TransactionResult", result)
             putExtra("TransactionType", transactionTypeFromHioPos)
             putExtra("TransactionId", originalHioPosTxnId)
-
-            Timber.d("TransactionId $originalHioPosTxnId.toString()")
-            // Usar DecimalFormat para formatear correctamente el monto como en BAC
-            val formato = DecimalFormat("0.00")
-            val amountDouble = transactionAmountProcessed.toDoubleOrNull() ?: 0.0
-            val amountMainForHioPos = formato.format(amountDouble).replace(".", "")
             putExtra("Amount", amountMainForHioPos)
-
             putExtra("TipAmount", tipAmountFromHioPos)
             putExtra("TaxAmount", taxAmountFromHioPos)
 
@@ -237,26 +236,26 @@ class QrResultActivity : ComponentActivity() {
                 putExtra("CurrencyISO", currencyISOFromHioPos)
             }
 
-            // Formato correcto para TransactionData siguiendo la estructura de BAC
+            // CORRECCIÓN: Formato correcto para TransactionData siguiendo la estructura de BAC
             val transactionDataToReturn = "$yappyTransactionId/$localOrderId"
             Timber.d("  Usando para TransactionData: '$transactionDataToReturn'")
             putExtra("TransactionData", transactionDataToReturn)
 
             putExtra("MerchantReceipt", merchantReceiptXml)
             putExtra("CustomerReceipt", customerReceiptXml)
-//            putExtra("BatchReceipt", batchReceiptXml)
 
             if (result == TefTransactionResults.RESULT_FAILED && !errorMessage.isNullOrBlank()) {
                 putExtra("ErrorMessage", errorMessage)
             }
         }
-        Timber.d("resultIntent -> ${intent.extras.toReadableString()}")
 
-        Timber.i("📬 QrResultActivity: Respuesta final para Hiopos -> ${resultIntent.extras.toReadableString()}")
+        // CORRECCIÓN: Corregir el log para referirse al intent correcto
+        Timber.d("resultIntent -> ${resultIntent.extras?.toReadableString()}")
 
-//         Imprimir extras en orden definido
+        Timber.i("📬 QrResultActivity: Respuesta final para Hiopos -> ${resultIntent.extras?.toReadableString()}")
+
+        // Imprimir extras en orden definido
         val extras = resultIntent.extras
-
         val orderedKeys = listOf(
             "TransactionResult", "TransactionType", "TransactionId",
             "Amount", "TipAmount", "TaxAmount", "CurrencyISO",
@@ -274,7 +273,6 @@ class QrResultActivity : ComponentActivity() {
         } else {
             Timber.i("📬 QrResultActivity: El Bundle de extras es nulo.")
         }
-//
 
         // IMPORTANTE: Configurar el resultado y finalizar la actividad
         setResult(Activity.RESULT_OK, resultIntent)
@@ -325,7 +323,6 @@ class QrResultActivity : ComponentActivity() {
             "PAB", "USD" -> numericISO
             else -> numericISO
         }
-//        return "0840"
     }
 
     private fun mapCurrencyISOToSymbol(isoAlphaOrNumeric: String): String {
@@ -338,13 +335,15 @@ class QrResultActivity : ComponentActivity() {
 
     private fun finishWithError(errorMessage: String, hioPosTxnIdToReturn: Int = originalHioPosTxnId) {
         Timber.e("‼️ QrResultActivity.finishWithError: HioPosTxnId=$hioPosTxnIdToReturn, Error='$errorMessage'")
-        val resultIntent = Intent().apply {
+
+        // CORRECCIÓN: Usar la acción correcta en el intent
+        val resultIntent = Intent("icg.actions.electronicpayment.tefbanesco.TRANSACTION").apply {
             putExtra("TransactionResult", TefTransactionResults.RESULT_FAILED)
             putExtra("TransactionType", transactionTypeFromHioPos)
             putExtra("ErrorMessage", errorMessage)
             if (hioPosTxnIdToReturn != 0) putExtra("TransactionId", hioPosTxnIdToReturn)
 
-            // Usar estructura correcta para TransactionData incluso en errores
+            // CORRECCIÓN: Unificar formato para TransactionData
             val transactionDataToReturn = if (yappyTransactionId.isNotBlank()) {
                 "$yappyTransactionId/$localOrderId"
             } else {
@@ -352,12 +351,13 @@ class QrResultActivity : ComponentActivity() {
             }
             putExtra("TransactionData", transactionDataToReturn)
 
-            // Formatear monto correctamente como en BAC
+            // CORRECCIÓN: Formatear monto correctamente como en BAC (sin punto decimal)
             val formato = DecimalFormat("0.00")
             val amountDbl = transactionAmountProcessed.toDoubleOrNull() ?: 0.0
             val amountFormatted = formato.format(amountDbl).replace(".", "")
             putExtra("Amount", amountFormatted)
 
+            // CORRECCIÓN: Incluir todos los extras esperados por HIOPOS
             putExtra("TipAmount", tipAmountFromHioPos)
             putExtra("TaxAmount", taxAmountFromHioPos)
 
@@ -366,11 +366,17 @@ class QrResultActivity : ComponentActivity() {
             }
         }
 
-        Timber.i("  📤 QrResultActivity.finishWithError: Enviando error a Hiopos: ${resultIntent.extras.toReadableString()}")
+        Timber.i("  📤 QrResultActivity.finishWithError: Enviando error a Hiopos: ${resultIntent.extras?.toReadableString()}")
         setResult(Activity.RESULT_OK, resultIntent)
         finish()
     }
 }
 
-// Mueve esto a utils/BundleUtils.kt o similar si no lo has hecho
-// fun Bundle?.toReadableString(): String { ... }
+// Extension function para mejorar la calidad del XML generado
+fun String.xmlEscape(): String {
+    return this.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+        .replace("'", "&apos;")
+}
