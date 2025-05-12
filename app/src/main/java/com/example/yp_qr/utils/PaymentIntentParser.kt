@@ -28,6 +28,9 @@ data class PaymentIntentData(
  * o null si no hay extras o ocurre un error.
  */
 fun parsePaymentIntent(intent: Intent): PaymentIntentData? {
+    Timber.d("parsePaymentIntent: Intent recibido: $intent")
+    Timber.d("parsePaymentIntent: Extras del Intent: ${intent.extras.toReadableString()}")
+
     val bundle: Bundle? = intent.extras
     if (bundle == null) {
         Timber.w("El Intent no contiene extras. No se pueden parsear los datos de la transacción.")
