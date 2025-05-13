@@ -153,49 +153,60 @@ class QrResultActivity : ComponentActivity() {
         )
         val customerReceipt = merchantReceipt
 
-        // Crear intent de resultado con SOLO los campos de salida esperados por HioPosCloud API v3.5
+        // Crear intent de resultado con todos los Extras necesarios
         val resultIntent = Intent("icg.actions.electronicpayment.tefbanesco.TRANSACTION")
 
-        // 1. Campos REQUERIDOS según el manual de HioPosCloud API v3.5
+        // DATOS OBLIGATORIOS (mismos que tefbanesco)
+
+        // 1. Resultados de Transacción
         resultIntent.putExtra("TransactionResult", result)
         resultIntent.putExtra("TransactionType", transactionType)
         resultIntent.putExtra("Amount", amountForHioPos)
-        resultIntent.putExtra("TipAmount", formattedTipAmount)
-        resultIntent.putExtra("TaxAmount", formattedTaxAmount)
 
-        // 2. Usar el ID de transacción real de Yappy como AuthorizationId (sin prefijos)
-        resultIntent.putExtra("AuthorizationId", yappyTransactionId)
-
-        // 3. Datos de tarjeta (simulados para Yappy)
+        // 2. Datos de tarjeta (simulados para Yappy)
         resultIntent.putExtra("CardNum", "**** **** **** ${localOrderId.takeLast(4)}")
         resultIntent.putExtra("CardHolder", "CLIENTE BANESCO")
         resultIntent.putExtra("CardType", "VISA")
+        resultIntent.putExtra("AuthorizationId", "AUTH_TEF_${yappyTransactionId.takeLast(5)}")
 
-        // 4. TransactionData - información adicional en formato JSON (según especificación)
+        // 3. Formato estructurado XML requerido por HioPOS para ShopData
+        resultIntent.putExtra("ShopData", shopDataXml) // Reutilizamos el XML que viene de entrada
+
+        // 4. Formato estructurado XML para SellerData
+        val sellerData = """<?xml version='1.0' encoding='utf-8'?>
+                           <sellerData>
+                              <email></email>
+                              <fiscalId></fiscalId>
+                              <givenName1></givenName1>
+                              <name>Administrador 1</name>
+                           </sellerData>"""
+        resultIntent.putExtra("SellerData", sellerData)
+
+        // 5. TransactionData en formato JSON (igual que tefbanesco)
         val timestamp = System.currentTimeMillis()
         val moduleId = "TEFBANESCO_MOD_ID_$timestamp"
         val jsonTransactionData = """{
             "module_id": "$moduleId",
-            "original_txn_id": "$originalHioPosTxnIdString",
-            "yappy_txn_id": "$yappyTransactionId",
+            "hio_id": "${originalHioPosTxnIdString.take(2)}",
             "status": "$result",
             "timestamp": "$timestamp"
         }""".trimIndent()
         resultIntent.putExtra("TransactionData", jsonTransactionData)
 
-        // 5. Comprobantes (obligatorios para transacción SALE según manual)
+        // 6. Campos adicionales
+        resultIntent.putExtra("TransactionId", originalHioPosTxnIdString)
         resultIntent.putExtra("MerchantReceipt", merchantReceipt)
         resultIntent.putExtra("CustomerReceipt", customerReceipt)
-
-        // 6. Añadir SurchargeAmount como 0 (para evitar posibles problemas)
-        resultIntent.putExtra("SurchargeAmount", "000")
+        resultIntent.putExtra("CurrencyISO", currencyISO)
+        resultIntent.putExtra("TipAmount", formattedTipAmount)
+        resultIntent.putExtra("TaxAmount", formattedTaxAmount)
 
         // 7. Campos para errores, si aplica
         if (result == TefTransactionResults.RESULT_FAILED && errorMessage != null) {
             resultIntent.putExtra("ErrorMessage", errorMessage)
             resultIntent.putExtra("ErrorMessageTitle", "Error Pago Yappy")
 
-            // Añadir ReceiptFailed para transacciones fallidas (requerido según manual)
+            // API v3.5: Añadir ReceiptFailed para transacciones fallidas
             val failureReceipt = buildReceipt(
                 numCols = printerCols,
                 shopXml = shopDataXml,
